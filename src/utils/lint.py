@@ -2,10 +2,8 @@
 
 from pathlib import Path
 
-from src.utils._lint_core import (
-    LintResult, FileReport,
-    analyze_py, analyze_md,
-)
+from src.utils._lint_types import LintResult, FileReport
+from src.utils._lint_core import analyze_py, analyze_md
 from src.utils._lint_fs import load_gitignore, is_ignored, collect_files
 from src.utils._lint_report import format_report
 

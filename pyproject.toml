@@ -12,6 +12,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
 ]
 
@@ -21,3 +22,20 @@ agent = "src.cli:main"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.agent-lint.src]
+lines = 200
+functions = 7
+classes = 3
+func_lines = 50
+imports = 15
+
+[tool.agent-lint.tests]
+lines = 300
+functions = 25
+classes = 5
+func_lines = 50
+imports = 15
+
+[tool.agent-lint.docs]
+lines = 150

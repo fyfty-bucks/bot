@@ -1,6 +1,6 @@
 """Lint report formatter: structured output for LLM + human."""
 
-from src.utils._lint_core import FileReport
+from src.utils._lint_types import FileReport
 
 
 def format_report(reports: list[FileReport], verbose: bool = False) -> str:
@@ -12,13 +12,14 @@ def format_report(reports: list[FileReport], verbose: bool = False) -> str:
         for r in reports:
             tag = "PASS" if r.passed else "FAIL"
             lines.append(f"  {tag}: {r.path} ({r.lines} lines)")
-            if not r.passed:
-                for x in r.results:
-                    if not x.passed:
-                        detail = f" — {x.detail}" if x.detail else ""
-                        lines.append(
-                            f"    {x.rule}: {x.value}/{x.limit}{detail}"
-                        )
+            for x in r.results:
+                if not x.passed:
+                    detail = f" — {x.detail}" if x.detail else ""
+                    lines.append(
+                        f"    {x.rule}: {x.value}/{x.limit}{detail}"
+                    )
+                elif x.severity == "info" and x.detail:
+                    lines.append(f"    INFO {x.rule}: {x.detail}")
         lines.append("---")
 
     total = len(reports)
