@@ -275,6 +275,19 @@ def test_analyze_py_function_count_ignores_nested(tmp_path: Path) -> None:
     assert func_check.value == 2
 
 
+def test_analyze_py_secret_in_test_file_is_info(tmp_path: Path) -> None:
+    """Secret in test file is detected with info severity, not failure."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    f = tests_dir / "test_with_secret.py"
+    f.write_text('"""Test."""\n\nFAKE = "sk-abc123def456ghi789jkl012mno345"\n')
+    report = analyze_py(f)
+    assert report.passed
+    info_results = [r for r in report.results if r.severity == "info"]
+    assert len(info_results) == 1
+    assert info_results[0].rule == "secret"
+
+
 def test_analyze_md_secret_detected(tmp_path: Path) -> None:
     """Secret pattern in markdown triggers failure."""
     f = tmp_path / "doc.md"

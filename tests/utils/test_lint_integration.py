@@ -110,6 +110,15 @@ def test_lint_path_directory(tmp_path: Path) -> None:
     assert names == {"a.py", "b.md", "c.py"}
 
 
+def test_lint_path_single_mdc_file(tmp_path: Path) -> None:
+    """lint_path on .mdc file returns one report."""
+    f = tmp_path / "rule.mdc"
+    f.write_text("# Rule\n\nContent\n")
+    reports = lint_path(f)
+    assert len(reports) == 1
+    assert reports[0].passed
+
+
 def test_lint_path_unknown_extension(tmp_path: Path) -> None:
     """lint_path on a single non-lintable file returns empty list."""
     f = tmp_path / "data.json"

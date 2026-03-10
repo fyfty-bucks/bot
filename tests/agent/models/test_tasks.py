@@ -128,6 +128,15 @@ def test_task_empty_input(test_db) -> None:
     assert task.get_input() == {}
 
 
+def test_start_from_failed_raises(test_db) -> None:
+    """Cannot restart a failed task."""
+    task = Task.create(task_type="llm_call", input_data="{}")
+    task.start()
+    task.fail(error="timeout")
+    with pytest.raises(InvalidTransition):
+        task.start()
+
+
 def test_terminal_states_explicit() -> None:
     """Terminal states (completed, failed) are explicit keys in VALID_TRANSITIONS."""
     from src.agent.models.tasks import VALID_TRANSITIONS

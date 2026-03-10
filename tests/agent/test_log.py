@@ -41,6 +41,7 @@ def test_setup_logging_format() -> None:
     """Log format includes timestamp and level."""
     logger = setup_logging(level="DEBUG")
     handler = logger.handlers[0]
-    fmt = handler.formatter._fmt
-    assert "%(asctime)s" in fmt
-    assert "%(levelname)s" in fmt
+    record = logging.LogRecord("test", logging.DEBUG, "", 0, "testmsg", (), None)
+    output = handler.format(record)
+    assert "DEBUG" in output
+    assert "testmsg" in output

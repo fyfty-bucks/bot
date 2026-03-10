@@ -79,6 +79,39 @@ def test_discover_handlers_from_package(tmp_path) -> None:
     assert result == {"pong": True}
 
 
+def test_register_overwrites_existing() -> None:
+    """Registering same name twice keeps the last handler."""
+    reg = HandlerRegistry()
+    reg.register("x", lambda d: {"first": True})
+    reg.register("x", lambda d: {"second": True})
+    result = reg.route("x", {})
+    assert result == {"second": True}
+
+
+def test_discover_skips_module_without_handle(tmp_path) -> None:
+    """Module with name but no handle() is skipped."""
+    pkg = tmp_path / "handlers"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "no_handle.py").write_text('name = "broken"\n')
+
+    reg = HandlerRegistry()
+    reg.discover(str(pkg))
+    assert "broken" not in reg.handlers
+
+
+def test_discover_skips_module_without_name(tmp_path) -> None:
+    """Module with handle() but no name is skipped."""
+    pkg = tmp_path / "handlers"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "no_name.py").write_text("def handle(data): return {}\n")
+
+    reg = HandlerRegistry()
+    reg.discover(str(pkg))
+    assert len(reg.handlers) == 0
+
+
 def test_discover_survives_bad_module(tmp_path) -> None:
     """Discovery continues past modules with import errors."""
     pkg = tmp_path / "handlers"
