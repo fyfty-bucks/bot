@@ -17,7 +17,7 @@ This is natural selection for code.
 
 ## Status
 
-Early development. See `PLAN.md` for roadmap.
+Early development. See master `PLAN0.md` for roadmap.
 
 ## License
 
