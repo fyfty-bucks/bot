@@ -1,46 +1,63 @@
-"""Tests for Config module — defaults, DB overrides, env overrides."""
-
-import os
+"""Tests for Config module — load() factory, defaults, DB overrides, env."""
 
 import pytest
 
-from src.agent.config import Config
+from src.agent.config import Config, DEFAULTS
 from src.agent.models.config_store import ConfigEntry
 
 
-def test_config_defaults(test_db) -> None:
-    """Config returns default values when DB and env are empty."""
-    cfg = Config(test_db)
+def test_config_load_defaults(test_db) -> None:
+    """Config.load() returns default values when DB and env are empty."""
+    cfg = Config.load(test_db)
     assert cfg.model_fast == "haiku"
     assert cfg.model_smart == "sonnet"
     assert cfg.budget_total == 50.0
 
 
+def test_config_load_no_db_uses_defaults() -> None:
+    """Config.load() without DB returns pure defaults."""
+    cfg = Config.load()
+    assert cfg.model_fast == "haiku"
+    assert cfg.budget_total == 50.0
+    assert cfg.db_path == "agent.db"
+
+
 def test_config_from_db_overrides_default(test_db) -> None:
     """Value from DB overrides the default."""
     ConfigEntry.upsert("model_fast", "sonnet")
-    cfg = Config(test_db)
+    cfg = Config.load(test_db)
     assert cfg.model_fast == "sonnet"
 
 
-def test_config_from_env_overrides_db(test_db, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_from_env_overrides_db(
+    test_db, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Env variable overrides both DB and default."""
     ConfigEntry.upsert("model_fast", "sonnet")
     monkeypatch.setenv("AGENT_MODEL_FAST", "opus")
-    cfg = Config(test_db)
+    cfg = Config.load(test_db)
     assert cfg.model_fast == "opus"
 
 
-def test_config_priority_order(test_db, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_priority_order(
+    test_db, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Priority: env > db > defaults."""
     ConfigEntry.upsert("budget_total", "30.0")
     monkeypatch.setenv("AGENT_BUDGET_TOTAL", "10.0")
-    cfg = Config(test_db)
+    cfg = Config.load(test_db)
     assert cfg.budget_total == 10.0
 
 
 def test_config_unknown_key_ignored(test_db) -> None:
     """Unknown key in DB does not break config loading."""
     ConfigEntry.upsert("garbage_key_xyz", "whatever")
-    cfg = Config(test_db)
+    cfg = Config.load(test_db)
     assert cfg.model_fast == "haiku"
+
+
+def test_config_invalid_db_value_falls_back(test_db) -> None:
+    """Invalid DB value (e.g. non-numeric for float) falls back to default."""
+    ConfigEntry.upsert("budget_total", "not_a_number")
+    cfg = Config.load(test_db)
+    assert cfg.budget_total == DEFAULTS["budget_total"]

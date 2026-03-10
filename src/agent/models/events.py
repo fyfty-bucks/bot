@@ -24,6 +24,11 @@ class Event(peewee.Model):
         """Deserialize payload JSON."""
         return json.loads(self.payload)
 
+    @classmethod
+    def log(cls, event_type: str, payload: dict) -> "Event":
+        """Create event and sync to FTS5 index."""
+        raise NotImplementedError
+
 
 class EventIndex(FTS5Model):
     """FTS5 full-text search index over events."""

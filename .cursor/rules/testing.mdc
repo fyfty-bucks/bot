@@ -15,13 +15,8 @@ pytest is the test framework. Tests are specification.
 
 ## Process
 
-Tests are Phase 2 of the development pipeline:
-
-```
-SPIKE → TEST → IMPLEMENT → VALIDATE → HARDEN
-```
-
-If you can't write the test, the task isn't clear enough → go back to spike.
+Tests are the TEST stage of the workflow (see `vibe-coding.mdc`).
+If you can't write the test, the task isn't clear enough — spike first.
 
 ---
 
@@ -44,42 +39,25 @@ If you can't write the test, the task isn't clear enough → go back to spike.
 
 ## Levels
 
-| Level | What | Phase | Example |
+| Level | What | Stage | Example |
 |-------|------|-------|---------|
-| Unit | Functions | 2: TEST | `parse_command()` |
-| Edge | Boundaries | 5: HARDEN | timeout, OOM, network down |
-| Integration | Module flow | 5: HARDEN | `Agent.execute_task()` |
+| Unit | Functions | TEST | `parse_command()` |
+| Edge | Boundaries | HARDEN | timeout, OOM, network down |
+| Integration | Module flow | HARDEN | `Agent.execute_task()` |
 
 ---
 
 ## Structure
 
-```
-tests/                           # Developer-owned tests
-  conftest.py                    # sys.path + shared fixtures
-  agent/
-    test_core.py                 # Agent loop tests
-    test_memory.py               # Memory/vector tests
-  system/
-    test_ssh.py                  # Remote operations
-  utils/
-    test_lint.py                 # Linter tests
-  crypto/
-    test_wallet.py               # Crypto module tests
-
-tests/agent_tests/               # Agent-owned tests (self-improvement)
-  conftest.py                    # Agent's own fixtures
-  test_skills.py                 # Skill tests written by agent
-  test_prompts.py                # Prompt optimization tests
-```
-
+Test layout mirrors `src/` structure. Explore with filesystem tools.
 Developer writes `tests/`. Agent writes `tests/agent_tests/`. No overlap.
+Fixtures in `conftest.py` are inherited by subfolders (pytest convention).
 
 ---
 
 ## Fixtures
 
-- Shared fixtures in `conftest.py` at appropriate level
+- Shared fixtures in `conftest.py` at appropriate directory level
 - Module-specific helpers in `_helpers.py`
 - Use `@pytest.fixture` for setup/teardown
 - Read existing fixtures before creating new ones
@@ -100,10 +78,10 @@ Developer writes `tests/`. Agent writes `tests/agent_tests/`. No overlap.
 ## Commit Order (strict)
 
 ```
-1. Tests commit (tests FAIL)              ← Phase 2: spec is locked
-2. Code commit (tests PASS)               ← Phase 3: implementation
-3. Refactor commit                        ← cleanup (tests still pass)
-4. Harden commit (edge cases added)       ← Phase 5: harden
+1. Tests commit (tests FAIL)     ← TEST stage: spec is locked
+2. Code commit (tests PASS)      ← IMPLEMENT stage
+3. Refactor commit               ← cleanup (tests still pass)
+4. Harden commit (edge cases)    ← HARDEN stage
 ```
 
 **Tests are immutable after step 1.** Changing a test after commit
@@ -111,13 +89,13 @@ requires explicit user approval and documented reason.
 
 ---
 
-## Stubs (Phase 2 only)
+## Stubs (DESIGN stage)
 
 When tests import modules that don't exist yet:
 - Create the minimum file structure (empty `__init__.py`, class signatures)
 - All methods raise `NotImplementedError`
 - Stubs are NOT implementation — they exist only so pytest can collect
-- Stubs are replaced in Phase 3, not modified
+- Stubs are replaced in IMPLEMENT stage, not modified
 
 ---
 
@@ -130,5 +108,5 @@ When tests import modules that don't exist yet:
 | Tests + code in same pass | Tests committed BEFORE code exists |
 | Can't write test → guess code | Can't write test → spike first |
 | Changing test to match code | Changing code to match test |
+| Rewrite all tests at once | Incremental, traceable changes |
 | Happy path only | Test every error path |
-| `except Exception: pass` | Log and handle specifically |

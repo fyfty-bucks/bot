@@ -1,4 +1,4 @@
-"""Budget tracking model."""
+"""Budget tracking model with auto-balance computation."""
 
 from datetime import datetime, timezone
 
@@ -18,3 +18,13 @@ class BudgetLog(peewee.Model):
 
     class Meta:
         table_name = "budget_log"
+
+    @classmethod
+    def record(
+        cls,
+        amount: float,
+        category: str,
+        description: str = "",
+    ) -> "BudgetLog":
+        """Create entry with auto-computed balance_after."""
+        raise NotImplementedError

@@ -2,6 +2,7 @@
 
 import json
 import logging
+from dataclasses import dataclass
 
 from playhouse.sqlite_ext import SqliteDatabase
 
@@ -9,6 +10,15 @@ from src.agent.handlers import HandlerRegistry
 from src.agent.models.events import Event
 
 logger = logging.getLogger("agent")
+
+
+@dataclass
+class HandleResult:
+    """Outcome of execute(): distinguishes unhandled, success, and error."""
+
+    handled: bool
+    result: dict | None = None
+    error: str | None = None
 
 
 class AgentCore:
@@ -27,11 +37,16 @@ class AgentCore:
         logger.debug("Received event %s id=%d", event_type, event.id)
         return event
 
-    def execute(self, event: Event) -> dict | None:
-        """Route event to handler, store result or error."""
+    def execute(self, event: Event) -> HandleResult:
+        """Route event to handler. Returns HandleResult with clear outcome."""
         data = json.loads(event.payload)
+        handler = self.registry.handlers.get(event.event_type)
+
+        if handler is None:
+            return HandleResult(handled=False)
+
         try:
-            result = self.registry.route(event.event_type, data)
+            result = handler(data)
         except Exception as exc:
             logger.error("Handler error for %s: %s", event.event_type, exc)
             Event.create(
@@ -42,7 +57,7 @@ class AgentCore:
                     "error": str(exc),
                 }),
             )
-            return None
+            return HandleResult(handled=True, error=str(exc))
 
         if result is not None:
             Event.create(
@@ -50,4 +65,4 @@ class AgentCore:
                 payload=json.dumps(result),
             )
 
-        return result
+        return HandleResult(handled=True, result=result)

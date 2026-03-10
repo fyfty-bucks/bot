@@ -43,17 +43,29 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 ## Phase 1: Core + DB ← CURRENT
 
 **Spike:** done
-**Test:** done (51 tests)
-**Implement:** done (9 modules)
+**Design:** done (Task state machine, BudgetLog.record, Event.log, Config.load, HandleResult)
+**Test:** 92 tests (61 green, 31 red — stubs await implementation)
+**Implement:** in progress
 
-**Harden:**
-- [ ] Validate task status transitions (pending→running→completed/failed)
-- [ ] Auto-sync Event → EventIndex (FTS5) on create
-- [ ] `db.atomic()` transactions in core loop
-- [ ] Budget balance auto-calculation on insert
-- [ ] ConfigEntry type coercion (str "50.0" → float 50.0)
-- [ ] Edge case tests: empty payload, huge payload, unicode
-- [ ] Watchdog (process-level, restart on hang) — deferred to Phase 4
+**Harden** (data integrity — must fix before real money flows):
+- [ ] `db.atomic()` transactions in `AgentCore.receive()` + `execute()`
+- [ ] `BudgetLog.balance_after` auto-calculated ← tests ready
+- [ ] `Task.status` state machine ← tests ready
+- [ ] Event → EventIndex auto-sync via `Event.log()` ← tests ready
+- [ ] `ConfigEntry` type coercion with fallback ← tests ready
+- [x] `execute()` returns `HandleResult` (no handler / success / error)
+- [x] Edge case tests: empty payload, huge payload, unicode
+- [ ] Watchdog — deferred to Phase 4
+
+**Refactor** (before Phase 2):
+- [ ] `pyproject.toml` (metadata, pytest pythonpath)
+- [ ] `dev` branch, move work off `main`
+- [ ] `Config.load(db)` classmethod factory ← tests ready
+- [ ] `db.ALL_MODELS` lazy (function, not constant)
+- [ ] `./agent` venv-aware for RPi
+- [ ] Split `_lint_core.py` (extract secret scanner)
+- [x] CLI integration tests
+- [ ] `info` command: actual DB stats
 
 ## Phase 2: LLM Integration
 
@@ -120,9 +132,9 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 
 ## Current
 
-**Phase:** 1 — Core + DB
-**Task:** Harden — edge cases, validation, transactions
-**Next:** Phase 2 spike (OpenRouter API)
+**Phase:** 1 — Core + DB / IMPLEMENT (31 stubs → code)
+**Tests:** 92 (61 green, 31 red)
+**Next:** implement, validate, Phase 2 spike
 
 ---
 

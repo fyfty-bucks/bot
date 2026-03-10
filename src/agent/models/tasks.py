@@ -1,9 +1,19 @@
-"""Task tracking model."""
+"""Task tracking model with state machine lifecycle."""
 
 import json
 from datetime import datetime, timezone
 
 import peewee
+
+
+class InvalidTransition(Exception):
+    """Raised when a task status transition is not allowed."""
+
+
+VALID_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"running"},
+    "running": {"completed", "failed"},
+}
 
 
 class Task(peewee.Model):
@@ -30,3 +40,19 @@ class Task(peewee.Model):
     def get_output(self) -> dict | None:
         """Deserialize output JSON, or None."""
         return json.loads(self.output_data) if self.output_data else None
+
+    def start(self) -> None:
+        """Transition pending -> running."""
+        raise NotImplementedError
+
+    def complete(
+        self,
+        output: dict | None = None,
+        cost_usd: float | None = None,
+    ) -> None:
+        """Transition running -> completed."""
+        raise NotImplementedError
+
+    def fail(self, error: str) -> None:
+        """Transition running -> failed."""
+        raise NotImplementedError

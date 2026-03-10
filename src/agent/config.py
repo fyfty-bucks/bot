@@ -27,17 +27,10 @@ class Config:
     log_level: str = field(default=DEFAULTS["log_level"])
     db_path: str = field(default=DEFAULTS["db_path"])
 
-    def __init__(self, db: SqliteDatabase | None = None) -> None:
-        db_values = _load_from_db(db) if db else {}
-        for f in fields(self.__class__):
-            default = DEFAULTS.get(f.name, f.default)
-            from_db = db_values.get(f.name)
-            from_env = os.environ.get(f"{ENV_PREFIX}{f.name.upper()}")
-
-            raw = from_env if from_env is not None else (
-                from_db if from_db is not None else default
-            )
-            setattr(self, f.name, f.type(raw))
+    @classmethod
+    def load(cls, db: SqliteDatabase | None = None) -> "Config":
+        """Load config: env > db > defaults. Type coercion with fallback."""
+        raise NotImplementedError
 
 
 def _load_from_db(db: SqliteDatabase) -> dict[str, str]:

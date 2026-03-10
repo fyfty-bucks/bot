@@ -1,5 +1,5 @@
 ---
-description: Development process — spike → test → implement
+description: Development workflow — 6 stages, strict gates
 globs: 
 alwaysApply: true
 ---
@@ -8,109 +8,111 @@ alwaysApply: true
 
 ## Goal
 
-Correct implementation with strict phase discipline.
+Correct implementation with strict stage discipline.
 Think thoroughly before first edit. Internal reasoning is free — use it.
-**Never skip a phase gate. Never write code in the TEST phase.**
+**Never skip a stage gate.**
 
 ---
 
-## Development Process
+## Terminology
 
-Every feature goes through five phases. Refactor after each.
+- **Stage** — workflow step: SPIKE, DESIGN, TEST, IMPLEMENT, VALIDATE, HARDEN
+- **Phase** — project milestone in PLAN.md: Phase 0, 1, 2, ...
+- **Step** — numbered action within a stage
+
+---
+
+## Workflow
+
+Every feature goes through six stages.
 
 ```
-SPIKE → TEST → IMPLEMENT → VALIDATE → HARDEN
-            refactor ↻ after each phase
+SPIKE → DESIGN → TEST → IMPLEMENT → VALIDATE → HARDEN
+                   refactor ↻ after each phase
 ```
 
-### Phase 1: SPIKE (exploration)
+### SPIKE (exploration)
 
 When: task is new, unclear, or involves unknown API/library.
 
 ```
 1. Create throwaway script (scripts/spike_*.py)
 2. Explore: try API, read docs, test assumptions
-3. Document findings in PLAN.md (L1 → L2)
+3. Document findings in PLAN.md
 4. Delete spike code
 ```
 
-Rules:
-- No tests for spike code
-- No production quality required
-- Goal: turn ambiguity into engineering clarity
-- Output: clear spec of what to build and how
-- Refactor: clean up PLAN.md notes, organize findings
+- No tests, no production quality. Goal: turn ambiguity into clarity.
+- If done → DESIGN. If can't proceed → document, revisit later.
 
-### Phase 2: TEST (specification)
+### DESIGN (interface contract)
 
 When: task is engineering-clear (spike done or was never needed).
 
 ```
-1. Write test files that define the contract
-2. Create ONLY stubs for imports (empty classes, NotImplementedError)
-3. Run tests — they MUST FAIL (red)
-4. ▶ STOP. Tell user: "tests ready for commit". Wait for commit.
+1. Define public method signatures (name, args, return type)
+2. Define error semantics (what raises, what returns)
+3. Review: would a caller find this intuitive?
+4. Write stubs (signatures + NotImplementedError bodies)
 ```
 
-Rules:
-- Tests BEFORE any implementation code
-- Tests derive from spec, NOT from implementation
-- Stubs = minimum for pytest to collect (class/function signature only)
-- Stubs raise NotImplementedError — no logic, no implementation
-- Tests MUST fail. If tests pass — something is wrong
-- If you can't write the test, go back to SPIKE
-- After user commits tests — proceed to Phase 3
-- **Tests are immutable after commit. Never change tests to fit code.**
-- Refactor: deduplicate fixtures, extract helpers
+- Interface principles in `interfaces.mdc`
+- Output: stubs that lock the API contract
+- ▶ STOP. Tell user: "interfaces designed". User reviews.
 
-### Phase 3: IMPLEMENT
+### TEST (specification)
+
+```
+1. Write test files that validate the contract from DESIGN
+2. Run tests — they MUST FAIL (red)
+3. ▶ STOP. Tell user: "tests ready for commit". Wait for commit.
+```
+
+- Tests derive from spec, NOT from implementation
+- Tests MUST fail. If tests pass — something is wrong
+- If you can't write the test → go back to SPIKE
+- **Tests are immutable after commit. Never change tests to fit code.**
+
+### IMPLEMENT
 
 ```
 1. Minimal code to pass all tests
 2. Run tests — all green
-3. ▶ STOP. Tell user: "implementation ready for commit". Wait for commit.
+3. ▶ STOP. Tell user: "implementation ready for commit".
 ```
 
-Rules:
 - Minimal code — pass tests, nothing more
-- If test fails and test is correct — fix code, not test
-- If test has a genuine spec bug — document why, get user approval to change
-- Refactor: extract functions, rename for clarity, split large files
+- If test is correct and code fails — fix code, not test
+- If test has a genuine spec bug — document, get user approval
 
-### Phase 4: VALIDATE
+### VALIDATE
 
 ```
 1. Run lint (./agent lint -v)
-2. Run full test suite (./agent tests)
-3. Check no regressions in other modules
-4. Verify file limits (≤200 lines)
+2. Run full test suite
+3. Check no regressions, file limits ≤200 lines
 ```
 
-Rules:
-- Fix any lint violations before proceeding
-- If new failures appeared — fix, don't skip
-- Refactor: if file >200 lines, split now
+- Fix any violations before proceeding
+- If file >200 lines, split now
 
-### Phase 5: HARDEN
+### HARDEN
 
 ```
-1. Add edge case tests (timeout, OOM, network down, bad input)
+1. Add edge case tests (bad input, timeout, unicode, concurrency)
 2. Add error handling to implementation
-3. Re-run full suite
-4. Update PLAN.md status
+3. Re-run full suite, update PLAN.md
 ```
 
-Rules:
 - Error paths tested, not just happy path
-- Refactor: simplify error handling, extract patterns
 
 ---
 
-## Decision: Spike or Test First?
+## Decision: Spike or Design First?
 
 ```
 Is the task engineering-clear?
-├── Yes → Phase 2: TEST (write spec as tests)
+├── Yes → DESIGN
 ├── No  → Is the domain known?
 │         ├── Yes → Quick spike (1-2 scripts)
 │         └── No  → Full spike (research + prototype)
@@ -119,14 +121,15 @@ Is the task engineering-clear?
 
 ---
 
-## Phase Gates (HARD STOPS)
+## Stage Gates (HARD STOPS)
 
 ```
-SPIKE  → output: findings in PLAN.md          → STOP, user reviews
-TEST   → output: failing tests + stubs        → STOP, user commits
-IMPL   → output: passing tests                → STOP, user commits
-VALID  → output: lint clean, no regressions   → STOP, user reviews
-HARDEN → output: edge case tests + fixes      → STOP, user commits
+SPIKE   → findings in PLAN.md          → STOP, user reviews
+DESIGN  → stubs with interfaces        → STOP, user reviews
+TEST    → failing tests + stubs        → STOP, user commits
+IMPL    → passing tests                → STOP, user commits
+VALID   → lint clean, no regressions   → STOP, user reviews
+HARDEN  → edge case tests + fixes      → STOP, user commits
 ```
 
 **Never cross a gate without user acknowledgment.**

@@ -1,4 +1,4 @@
-"""Tests for Event and EventIndex (FTS5) models."""
+"""Tests for Event and EventIndex — including Event.log() auto-sync."""
 
 import json
 from datetime import datetime, timezone, timedelta
@@ -7,7 +7,7 @@ from src.agent.models.events import Event, EventIndex
 
 
 def test_create_event(test_db) -> None:
-    """Basic event creation and retrieval."""
+    """Basic event creation and retrieval via raw create()."""
     event = Event.create(
         event_type="task_completed",
         payload=json.dumps({"task": "deploy"}),
@@ -64,17 +64,21 @@ def test_filter_events_by_date_range(test_db) -> None:
     assert len(results) == 3
 
 
-def test_fts5_search_finds_matching(test_db) -> None:
-    """FTS5 search finds matching text."""
-    event = Event.create(
-        event_type="task_completed",
-        payload=json.dumps({"desc": "deployed new skill module"}),
-    )
-    EventIndex.insert({
-        EventIndex.rowid: event.id,
-        EventIndex.text: "deployed new skill module",
-        EventIndex.event_type: event.event_type,
-    }).execute()
+def test_log_creates_event_and_index(test_db) -> None:
+    """Event.log() creates both Event row and EventIndex entry."""
+    event = Event.log("task_completed", {"desc": "deployed module"})
+
+    loaded = Event.get_by_id(event.id)
+    assert loaded.event_type == "task_completed"
+
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert idx.event_type == "task_completed"
+    assert "deployed module" in idx.text
+
+
+def test_log_searchable_via_fts5(test_db) -> None:
+    """Events created via log() are immediately searchable."""
+    Event.log("deploy", {"desc": "deployed new skill module"})
 
     results = list(EventIndex.search_bm25("deploy skill").limit(5))
     assert len(results) >= 1
@@ -83,12 +87,7 @@ def test_fts5_search_finds_matching(test_db) -> None:
 
 def test_fts5_search_no_match(test_db) -> None:
     """FTS5 search returns empty for non-matching query."""
-    event = Event.create(event_type="check", payload="{}")
-    EventIndex.insert({
-        EventIndex.rowid: event.id,
-        EventIndex.text: "budget check completed",
-        EventIndex.event_type: event.event_type,
-    }).execute()
+    Event.log("check", {"desc": "budget check completed"})
 
     results = list(EventIndex.search_bm25("telegram message").limit(5))
     assert len(results) == 0
@@ -101,28 +100,49 @@ def test_fts5_search_ranked(test_db) -> None:
         "production deploy of skill module with deploy verification",
         "unrelated budget check",
     ]
-    for i, text in enumerate(texts):
-        event = Event.create(event_type="log", payload="{}")
-        EventIndex.insert({
-            EventIndex.rowid: event.id,
-            EventIndex.text: text,
-            EventIndex.event_type: "log",
-        }).execute()
+    for text in texts:
+        Event.log("log", {"desc": text})
 
     results = list(EventIndex.search_bm25("deploy", with_score=True).limit(3))
     assert len(results) >= 2
     assert "deploy" in results[0].text
 
 
-def test_event_index_synced_on_create(test_db) -> None:
-    """EventIndex entry matches the Event rowid."""
-    event = Event.create(event_type="sync_test", payload="{}")
-    EventIndex.insert({
-        EventIndex.rowid: event.id,
-        EventIndex.text: "sync verification entry",
-        EventIndex.event_type: event.event_type,
-    }).execute()
+# --- Edge cases ---
 
-    idx = EventIndex.get(EventIndex.rowid == event.id)
-    assert idx.text == "sync verification entry"
-    assert idx.event_type == "sync_test"
+
+def test_event_empty_payload(test_db) -> None:
+    """Event with empty dict payload stores and retrieves correctly."""
+    event = Event.create(event_type="empty", payload=json.dumps({}))
+    loaded = Event.get_by_id(event.id)
+    assert loaded.get_payload() == {}
+
+
+def test_event_unicode_payload(test_db) -> None:
+    """Event with unicode characters in payload round-trips correctly."""
+    data = {"msg": "Привет мир", "emoji": "🤖", "jp": "日本語"}
+    event = Event.create(event_type="unicode", payload=json.dumps(data))
+    loaded = Event.get_by_id(event.id)
+    assert loaded.get_payload() == data
+
+
+def test_event_large_payload(test_db) -> None:
+    """Event with ~10KB payload stores and retrieves correctly."""
+    data = {"items": [{"id": i, "text": "x" * 100} for i in range(100)]}
+    event = Event.create(event_type="large", payload=json.dumps(data))
+    loaded = Event.get_by_id(event.id)
+    assert loaded.get_payload() == data
+
+
+def test_log_empty_payload(test_db) -> None:
+    """Event.log() with empty dict creates event and index."""
+    event = Event.log("empty", {})
+    loaded = Event.get_by_id(event.id)
+    assert loaded.event_type == "empty"
+
+
+def test_log_unicode_payload(test_db) -> None:
+    """Event.log() indexes unicode text for FTS5 search."""
+    Event.log("msg", {"text": "Привет мир, это агент"})
+    results = list(EventIndex.search_bm25("агент").limit(5))
+    assert len(results) >= 1
