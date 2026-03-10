@@ -1,0 +1,14 @@
+secrets/
+!secrets/.gitkeep
+000/
+
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+*.vec
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/

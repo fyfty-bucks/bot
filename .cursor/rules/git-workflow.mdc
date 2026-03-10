@@ -1,0 +1,83 @@
+---
+description: Git workflow — three branch tiers, consensus merge
+globs: 
+alwaysApply: true
+---
+
+# Git Workflow (Opus 4.6)
+
+## Principle
+
+Three branch tiers: `main` (stable), `dev` (developer), `agent` (agent).
+**Opus works in `dev`. User commits. Merge to main via consensus.**
+
+---
+
+## Branch Model
+
+```
+main                    # Stable, deployed on RPi. Merge-only.
+├── dev                 # Developer works here (Cursor + Opus)
+└── agent               # Agent's primary branch (RPi)
+    ├── agent/skills    # Agent sub-branch (if needed)
+    └── agent/evolve-N  # Evolution cycle branch
+```
+
+Flow:
+```
+dev ──consensus──→ main ──pull──→ agent
+                    ↑                │
+                    └── consensus ───┘
+```
+
+Merge to main: requires consensus of developers + model review.
+
+---
+
+## Opus Rules
+
+### MAY
+
+- `git status`, `git diff`, `git log` — read-only
+- `git add` — when user requests
+
+### MUST NOT
+
+- `git commit`, `git push`, `git merge`, `git rebase`
+
+---
+
+## Developer Workflow (in `dev`)
+
+```
+1. Work in dev branch
+2. Opus edits, user commits
+3. When ready: consensus merge dev → main
+4. Agent detects main update, pulls into agent
+```
+
+---
+
+## Commit Message Format
+
+```
+type: description
+
+Details if needed
+```
+
+Types: `test`, `code`, `refactor`, `fix`, `docs`, `rule`
+
+---
+
+## File Ownership
+
+| Owner | Scope | Agent may |
+|-------|-------|-----------|
+| Developer | `src/agent/core.py`, `src/cli.py`, `src/utils/` | Read-only |
+| Developer | `.cursor/`, `agent_rules/core-constitution.md` | Read-only |
+| Agent | `src/skills/`, `src/agent/prompts/`, `src/agent/config/` | Full control |
+| Agent | `tests/agent_tests/` | Full control (own tests) |
+| Agent | `agent_rules/runtime/` | Modify within bounds |
+| Shared | `CHANGELOG.md` | Append-only |
+| Protected | `agent_rules/core-constitution.md` | NEVER modify |

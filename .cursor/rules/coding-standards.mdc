@@ -1,0 +1,39 @@
+---
+description: Coding standards enforced by lint
+globs: 
+alwaysApply: true
+---
+
+# Coding Standards
+
+## Principle
+
+LLM-optimized codebase. Small files, typed interfaces, no leaked secrets.
+
+---
+
+## Limits (enforced by `./agent lint`)
+
+| Scope | lines | functions | classes | func_lines | imports |
+|-------|-------|-----------|---------|------------|---------|
+| src/**/*.py | 200 | 7 | 3 | 50 | 15 |
+| tests/**/*.py | 300 | 25 | 5 | 50 | 15 |
+| **/*.md, **/*.mdc | 150 | — | — | — | — |
+
+---
+
+## Rules
+
+- Module docstring required for every .py file
+- Type hints required on public function signatures (not `_private`)
+- Linter reads .gitignore and skips excluded paths
+
+---
+
+## When lines > limit
+
+Split into submodules with single responsibility.
+
+## When functions > limit
+
+Extract to separate module.

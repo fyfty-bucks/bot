@@ -1,0 +1,119 @@
+---
+description: Testing conventions — TDD, tests as specification
+globs: 
+alwaysApply: true
+---
+
+# Testing
+
+## Principle
+
+pytest is the test framework. Tests are specification.
+**Tests define the contract BEFORE implementation exists.**
+
+---
+
+## Process
+
+Tests are Phase 2 of the development pipeline:
+
+```
+SPIKE → TEST → IMPLEMENT → VALIDATE → HARDEN
+```
+
+If you can't write the test, the task isn't clear enough → go back to spike.
+
+---
+
+## Convention
+
+- Runner: `pytest tests/ -v`
+- Single: `pytest tests/agent/test_core.py -v`
+- Coverage: `pytest --cov=src tests/`
+- Entry: `./agent tests` or `./agent tests -v`
+
+---
+
+## Test File Rules
+
+- `sys.path.insert` only in `conftest.py` — never in test files
+- NO `if __name__ == "__main__"` — pytest discovers tests
+- Assertions via `assert` (pytest rewrites for clear diffs)
+
+---
+
+## Levels
+
+| Level | What | Phase | Example |
+|-------|------|-------|---------|
+| Unit | Functions | 2: TEST | `parse_command()` |
+| Edge | Boundaries | 5: HARDEN | timeout, OOM, network down |
+| Integration | Module flow | 5: HARDEN | `Agent.execute_task()` |
+
+---
+
+## Structure
+
+```
+tests/                           # Developer-owned tests
+  conftest.py                    # sys.path + shared fixtures
+  agent/
+    test_core.py                 # Agent loop tests
+    test_memory.py               # Memory/vector tests
+  system/
+    test_ssh.py                  # Remote operations
+  utils/
+    test_lint.py                 # Linter tests
+  crypto/
+    test_wallet.py               # Crypto module tests
+
+tests/agent_tests/               # Agent-owned tests (self-improvement)
+  conftest.py                    # Agent's own fixtures
+  test_skills.py                 # Skill tests written by agent
+  test_prompts.py                # Prompt optimization tests
+```
+
+Developer writes `tests/`. Agent writes `tests/agent_tests/`. No overlap.
+
+---
+
+## Fixtures
+
+- Shared fixtures in `conftest.py` at appropriate level
+- Module-specific helpers in `_helpers.py`
+- Use `@pytest.fixture` for setup/teardown
+- Read existing fixtures before creating new ones
+
+---
+
+## Recovery
+
+### When Tests Fail
+
+1. Read the assertion error, not the full traceback
+2. Determine: test bug or code bug?
+3. Fix root cause, not symptom
+4. Re-run only failing test: `pytest path/to/test.py::test_name -v`
+
+---
+
+## Commit Order
+
+```
+1. Tests commit (tests fail)               ← Phase 2: spec
+2. Code commit (tests pass)                ← Phase 3: implement
+3. Refactor commit (after each phase)      ← cleanup
+4. Harden commit (edge cases + error tests)← Phase 5: harden
+```
+
+---
+
+## Anti-Patterns
+
+| Bad | Good |
+|-----|------|
+| Tests after code | Tests before code (TDD) |
+| Tests from implementation | Tests from spec |
+| Can't write test → guess code | Can't write test → spike first |
+| Happy path only | Test every error path |
+| `except Exception: pass` | Log and handle specifically |

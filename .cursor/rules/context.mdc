@@ -1,0 +1,78 @@
+---
+description: Context strategy for Opus 4.6 — read core fully, branch on demand.
+globs: 
+alwaysApply: true
+---
+
+# Context Strategy (Opus 4.6)
+
+## Principle
+
+Code is the documentation. All files ≤200 lines.
+**Read core fully, task branch on demand.**
+
+Budget: $50 total. Every wasted token = lost capability.
+
+---
+
+## Session Start (before first edit)
+
+### Step 1: Core (always)
+
+```
+PLAN.md                        # Work plan, phases, current state
+src/agent/core.py              # Main agent loop
+src/agent/config.py            # Configuration
+agent_rules/                   # Agent's constitutional rules (skim index)
+```
+
+### Step 2: Task Branch (when task requires it)
+
+Read **all files** in the touched module + its tests:
+
+- Agent core → `src/agent/`, `tests/agent/`
+- System ops → `src/system/`, `tests/system/`
+- Crypto → `src/crypto/`, `tests/crypto/`
+- Skills → `src/skills/{name}/`, `tests/skills/{name}/`
+- Agent rules → `agent_rules/{name}.md`
+
+### Step 3: Reference Pattern (when building new)
+
+One completed module of the same kind. ONE, not all.
+
+---
+
+## Scope
+
+This file governs **Opus 4.6 in Cursor IDE** — not the deployed agent.
+Agent's own context strategy lives in `agent_rules/memory.md`.
+
+---
+
+## Token Economy
+
+- Batch independent reads in single message
+- Don't read files >200 lines without offset/limit
+- If file doesn't exist yet, skip it
+- Prefer grep/glob over full reads
+
+---
+
+## Core Principle
+
+**Study the core always, study feature implementation only when required.**
+Keep the core optimized for context engineering — small, clean, well-structured.
+Core = the part that fits in every context window.
+Implementation = loaded on demand per task.
+
+---
+
+## Anti-Patterns
+
+| Bad | Good |
+|-----|------|
+| Read all .py files at session start | Core + task branch |
+| Read all modules when working on one | One reference pattern |
+| Read "just in case" | Grep on demand |
+| Skip core, dive into implementation | Core first, then branch |
+| Re-read unchanged files | Track what's in context |

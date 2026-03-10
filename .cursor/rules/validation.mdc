@@ -1,0 +1,44 @@
+---
+description: Anti-hallucination for Opus 4.6 — verified facts only
+globs: 
+alwaysApply: true
+---
+
+# Validation (Opus 4.6)
+
+## Principle
+
+**Verified facts only.** No estimates, no assumed metrics.
+
+---
+
+## Validation Levels
+
+| Level | Name | Meaning |
+|-------|------|---------|
+| L1 | Hypothesis | Unverified, in PLAN.md |
+| L2 | Sampled | Partial coverage |
+| L3 | Verified | Full coverage |
+
+---
+
+## Rules
+
+NEVER:
+- Generate counts without query
+- Hardcode metrics in code
+- "Approximately", "~1M rows"
+- Assume system state without checking
+
+ALWAYS:
+- Run query → show result
+- State coverage %
+- Mark hypotheses in PLAN.md
+
+---
+
+## Agent's Validation
+
+The deployed agent has its own validation rules in
+`agent_rules/core-constitution.md` (safety) and `agent_rules/runtime/autonomy.md`
+(resource thresholds). When writing agent code, implement those checks as runtime logic.

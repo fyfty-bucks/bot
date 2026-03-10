@@ -1,0 +1,136 @@
+---
+description: Development process — spike → test → implement
+globs: 
+alwaysApply: true
+---
+
+# Vibe Coding
+
+## Goal
+
+Correct implementation with minimal round-trips.
+Think thoroughly before first edit. Internal reasoning is free — use it.
+
+---
+
+## Development Process
+
+Every feature goes through five phases. Refactor after each.
+
+```
+SPIKE → TEST → IMPLEMENT → VALIDATE → HARDEN
+            refactor ↻ after each phase
+```
+
+### Phase 1: SPIKE (exploration)
+
+When: task is new, unclear, or involves unknown API/library.
+
+```
+1. Create throwaway script (scripts/spike_*.py)
+2. Explore: try API, read docs, test assumptions
+3. Document findings in PLAN.md (L1 → L2)
+4. Delete spike code
+```
+
+Rules:
+- No tests for spike code
+- No production quality required
+- Goal: turn ambiguity into engineering clarity
+- Output: clear spec of what to build and how
+- Refactor: clean up PLAN.md notes, organize findings
+
+### Phase 2: TEST (specification)
+
+When: task is engineering-clear (spike done or was never needed).
+
+```
+1. Write failing tests that define the contract
+2. Tests = specification (what, not how)
+3. Cover: happy path + error cases + edge cases
+4. Commit tests separately
+```
+
+Rules:
+- Tests BEFORE any implementation code
+- Tests derive from spec, NOT from implementation
+- If you can't write the test, go back to SPIKE
+- Refactor: deduplicate fixtures, extract helpers
+
+### Phase 3: IMPLEMENT
+
+```
+1. Minimal code to pass all tests
+2. Run tests — all green
+3. Commit implementation separately
+```
+
+Rules:
+- Minimal code — pass tests, nothing more
+- Refactor: extract functions, rename for clarity, split large files
+
+### Phase 4: VALIDATE
+
+```
+1. Run lint (./agent lint -v)
+2. Run full test suite (./agent tests)
+3. Check no regressions in other modules
+4. Verify file limits (≤200 lines)
+```
+
+Rules:
+- Fix any lint violations before proceeding
+- If new failures appeared — fix, don't skip
+- Refactor: if file >200 lines, split now
+
+### Phase 5: HARDEN
+
+```
+1. Add edge case tests (timeout, OOM, network down, bad input)
+2. Add error handling to implementation
+3. Re-run full suite
+4. Update PLAN.md status
+```
+
+Rules:
+- Error paths tested, not just happy path
+- Refactor: simplify error handling, extract patterns
+
+---
+
+## Decision: Spike or Test First?
+
+```
+Is the task engineering-clear?
+├── Yes → Phase 2: TEST (write spec as tests)
+├── No  → Is the domain known?
+│         ├── Yes → Quick spike (1-2 scripts)
+│         └── No  → Full spike (research + prototype)
+└── Partially → Spike the unclear part only
+```
+
+---
+
+## Before First Edit
+
+- Know the goal: read `PLAN.md` for current phase
+- Know the pattern: read existing module of the same kind
+- Know the contract: derive tests from spec
+- Know the constraints: RPi 4 = 8GB RAM, ARM64
+
+---
+
+## Constraints
+
+- File limits: ≤200 lines per file
+- Tests first: see `testing.mdc`
+- Validation: see `validation.mdc`
+
+---
+
+## Done Criteria
+
+1. Tests pass for affected module
+2. No files >200 lines
+3. No new anti-patterns
+4. PLAN.md updated if milestone reached
