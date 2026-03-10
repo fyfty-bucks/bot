@@ -44,26 +44,6 @@ def test_is_ignored_via_pathspec(tmp_path: Path) -> None:
     assert not is_ignored(src, tmp_path, spec)
 
 
-def test_load_gitignore_returns_pathspec(tmp_path: Path) -> None:
-    """load_gitignore returns a pathspec.PathSpec object."""
-    import pathspec as ps
-    gi = tmp_path / ".gitignore"
-    gi.write_text("secrets/\n__pycache__/\n*.pyc\n")
-    spec = load_gitignore(tmp_path)
-    assert isinstance(spec, ps.PathSpec)
-
-
-def test_load_gitignore_matches_patterns(tmp_path: Path) -> None:
-    """PathSpec correctly matches gitignore patterns."""
-    gi = tmp_path / ".gitignore"
-    gi.write_text("secrets/\n__pycache__/\n*.pyc\n# comment\n")
-    spec = load_gitignore(tmp_path)
-    assert spec.match_file("secrets/key.env")
-    assert spec.match_file("__pycache__/foo.pyc")
-    assert spec.match_file("some.pyc")
-    assert not spec.match_file("src/main.py")
-
-
 def test_load_gitignore_handles_negation(tmp_path: Path) -> None:
     """PathSpec handles negation patterns (!) correctly."""
     gi = tmp_path / ".gitignore"

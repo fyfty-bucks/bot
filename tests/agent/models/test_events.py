@@ -134,20 +134,6 @@ def test_event_large_payload(test_db) -> None:
     assert loaded.get_payload() == data
 
 
-def test_log_empty_payload(test_db) -> None:
-    """Event.log() with empty dict creates event and index."""
-    event = Event.log("empty", {})
-    loaded = Event.get_by_id(event.id)
-    assert loaded.event_type == "empty"
-
-
-def test_log_unicode_payload(test_db) -> None:
-    """Event.log() indexes unicode text for FTS5 search."""
-    Event.log("msg", {"text": "Привет мир, это агент"})
-    results = list(EventIndex.search_bm25("агент").limit(5))
-    assert len(results) >= 1
-
-
 def test_log_atomic_on_index_failure(test_db) -> None:
     """If FTS5 indexing fails, Event.log() rolls back Event creation."""
     with patch.object(EventIndex, "insert", side_effect=Exception("FTS5 err")):

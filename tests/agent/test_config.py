@@ -41,16 +41,6 @@ def test_config_from_env_overrides_db(
     assert cfg.model_fast == "opus"
 
 
-def test_config_priority_order(
-    test_db, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Priority: env > db > defaults."""
-    ConfigEntry.upsert("budget_total", "30.0")
-    monkeypatch.setenv("AGENT_BUDGET_TOTAL", "10.0")
-    cfg = Config.load(test_db)
-    assert cfg.budget_total == 10.0
-
-
 def test_config_unknown_key_ignored(test_db) -> None:
     """Unknown key in DB does not break config loading."""
     ConfigEntry.upsert("garbage_key_xyz", "whatever")

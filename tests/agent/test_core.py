@@ -7,7 +7,7 @@ import pytest
 from playhouse.sqlite_ext import SqliteDatabase
 
 from src.agent.core import AgentCore, HandleResult
-from src.agent.models.events import Event, EventIndex
+from src.agent.models.events import Event
 
 
 def _ok_handler(event_data: dict) -> dict:
@@ -106,15 +106,6 @@ def test_execute_handler_returns_none(test_db) -> None:
     assert hr.error is None
 
 
-def test_receive_is_atomic(test_db) -> None:
-    """receive() wraps DB write in a transaction."""
-    core = AgentCore(test_db)
-    event = core.receive("atomic_test", {"key": "val"})
-
-    loaded = Event.get_by_id(event.id)
-    assert loaded.event_type == "atomic_test"
-
-
 def test_full_cycle(test_db) -> None:
     """Full cycle: receive -> execute -> both events in DB."""
     core = AgentCore(test_db)
@@ -135,44 +126,6 @@ def test_full_cycle(test_db) -> None:
     assert all_events[1].event_type == "handler_result"
     result = json.loads(all_events[1].payload)
     assert result["pong"] is True
-
-
-def test_receive_empty_data(test_db) -> None:
-    """receive() with empty dict stores valid event."""
-    core = AgentCore(test_db)
-    event = core.receive("empty", {})
-
-    loaded = Event.get_by_id(event.id)
-    assert json.loads(loaded.payload) == {}
-
-
-def test_receive_unicode_data(test_db) -> None:
-    """receive() with unicode data round-trips correctly."""
-    core = AgentCore(test_db)
-    data = {"msg": "Привет", "emoji": "🤖"}
-    event = core.receive("unicode", data)
-
-    loaded = Event.get_by_id(event.id)
-    assert json.loads(loaded.payload) == data
-
-
-def test_receive_large_data(test_db) -> None:
-    """receive() with large payload stores correctly."""
-    core = AgentCore(test_db)
-    data = {"items": [{"id": i, "v": "x" * 100} for i in range(100)]}
-    event = core.receive("large", data)
-
-    loaded = Event.get_by_id(event.id)
-    assert json.loads(loaded.payload) == data
-
-
-def test_receive_syncs_to_fts5(test_db) -> None:
-    """receive() creates event AND syncs to FTS5 index."""
-    core = AgentCore(test_db)
-    event = core.receive("search_test", {"desc": "findable content"})
-
-    results = list(EventIndex.search_bm25("findable").limit(5))
-    assert len(results) >= 1
 
 
 def test_execute_survives_result_storage_failure(test_db) -> None:

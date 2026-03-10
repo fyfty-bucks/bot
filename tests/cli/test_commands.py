@@ -15,22 +15,12 @@ def _run_main(*args: str) -> tuple[int, str]:
     return code, out.getvalue()
 
 
-def test_no_args_returns_help_code() -> None:
-    """No arguments prints help and returns exit code 2."""
+def test_no_args_shows_help_with_commands() -> None:
+    """No arguments prints help (exit 2) listing all discovered commands."""
     code, output = _run_main()
     assert code == 2
     assert "usage" in output.lower()
-
-
-def test_lint_command_available() -> None:
-    """lint command is discovered and listed in help."""
-    code, output = _run_main()
     assert "lint" in output
-
-
-def test_tests_command_available() -> None:
-    """tests command is discovered and listed in help."""
-    code, output = _run_main()
     assert "tests" in output
 
 

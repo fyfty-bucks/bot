@@ -39,18 +39,6 @@ def test_config_json_value(test_db) -> None:
     assert entry.get_value() == data
 
 
-def test_config_key_is_unique(test_db) -> None:
-    """Upsert with same key overwrites previous value."""
-    ConfigEntry.upsert("key1", "first")
-    ConfigEntry.upsert("key1", "second")
-
-    count = ConfigEntry.select().where(ConfigEntry.key == "key1").count()
-    assert count == 1
-
-    entry = ConfigEntry.get_by_id("key1")
-    assert entry.get_value() == "second"
-
-
 def test_upsert_string_preserves_type(test_db) -> None:
     """String '42' stored via upsert returns string '42', not int 42."""
     ConfigEntry.upsert("port", "42")

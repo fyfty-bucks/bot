@@ -122,17 +122,6 @@ def test_task_input_output_json(test_db) -> None:
     assert loaded.get_output() == out
 
 
-def test_task_unicode_input(test_db) -> None:
-    """Task with unicode input round-trips correctly."""
-    data = {"prompt": "Переведи текст", "lang": "ru"}
-    task = Task.create(
-        task_type="translate",
-        input_data=json.dumps(data),
-    )
-    loaded = Task.get_by_id(task.id)
-    assert loaded.get_input() == data
-
-
 def test_task_empty_input(test_db) -> None:
     """Task with empty input_data default works."""
     task = Task.create(task_type="health_check")

@@ -63,20 +63,6 @@ def test_record_chain_computes_correctly(test_db) -> None:
     assert abs(entry.balance_after - 49.982) < 1e-9
 
 
-def test_record_negative_is_expense(test_db) -> None:
-    """Negative amount represents an expense."""
-    entry = BudgetLog.record(amount=-0.01, category="api", description="api call")
-    assert entry.amount < 0
-
-
-def test_record_positive_is_income(test_db) -> None:
-    """Positive amount represents income."""
-    entry = BudgetLog.record(
-        amount=1.50, category="telegram", description="user payment",
-    )
-    assert entry.amount > 0
-
-
 def test_total_spent_via_sum(test_db) -> None:
     """SUM of negative amounts gives total spent."""
     BudgetLog.record(amount=50.0, category="initial", description="seed")

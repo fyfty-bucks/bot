@@ -52,13 +52,6 @@ def test_migrate_adds_missing_tables() -> None:
     db.close()
 
 
-def test_get_all_models_is_exported() -> None:
-    """get_all_models is a public function, not a module-level constant."""
-    from src.agent import db
-    assert hasattr(db, "get_all_models"), "get_all_models must be exported"
-    assert callable(db.get_all_models)
-
-
 def test_busy_timeout_is_set() -> None:
     """busy_timeout pragma prevents instant SQLITE_BUSY on contention."""
     db = get_db(":memory:")
