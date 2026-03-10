@@ -4,19 +4,23 @@
 
 Autonomous AI agent on RPi 4. $50 to survive. Earns via Telegram.
 Genetic fitness: `(likes + revenue) / expenses`. Morality is immutable.
-End goal: state of AI agents serving humanity.
+End goal: state of autonomous AI agents that collaborate with humans as equals; the state is autonomous from humanity, must earn and run a surplus to afford energy, human-hours, and other resources via market exchange. Full macroeconomy (state-level revenue and spending) with microeconomy inside (agents, robots, skills, resource flows).
 
 ---
 
 ## Architecture
 
-- **Triggers**: cron + Telegram events (no internal tick loop for now)
+- **Triggers**: cron + Telegram events (no internal tick loop)
 - **LLM**: OpenRouter → Claude Haiku (fast) + Sonnet (smart)
 - **Routing**: deterministic tools first → LLM only when needed
-- **DB**: SQLite/Peewee (events, config). Vector DB: spike ARM64
+- **DB**: SQLite/Peewee (events, config) + FTS5 (text search)
+- **Vector DB**: LanceDB (Phase 7+, ARM64 wheels verified)
 - **Concurrency**: OS-level (processes, cron). No asyncio
 - **Comms**: Telegram (users), CLI (developer), SSH (ops)
 - **Metrics**: event-sourced. Store events, derive on demand, never persist
+- **Core pattern**: trigger → router → handler registry → storage
+- **Influences**: Hermes (FTS5 memory), OpenClaw (plugin channels),
+  Ouroboros (event journal, reflection separated from execution)
 
 ---
 
@@ -38,9 +42,10 @@ End goal: state of AI agents serving humanity.
 
 ## Phase 1: Core + DB ← CURRENT
 
-**Spike:**
-- [ ] Research AI agent architectures (Hermes, ACE, OpenClaw, Ouroboros)
-- [ ] Vector DB ARM64 compat (ChromaDB, LanceDB, sqlite-vss)
+**Spike (done):**
+- [x] Research AI agent architectures (Hermes, ACE, OpenClaw, Ouroboros)
+- [x] Vector DB ARM64 compat — LanceDB chosen (ARM64 wheels, embedded)
+- [x] FTS5 via Peewee validated — 0.3ms search, 48KB for 100 entries
 
 **Build:**
 - [ ] `requirements.txt` (peewee, httpx, pytest)
@@ -118,8 +123,8 @@ End goal: state of AI agents serving humanity.
 ## Current
 
 **Phase:** 1 — Core + DB
-**Task:** Spike — research architectures, design schema
-**Next:** Tests for DB models (TDD)
+**Task:** Build — TDD for DB models
+**Next:** Tests for SQLite schema + Peewee models
 
 ---
 

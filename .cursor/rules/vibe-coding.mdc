@@ -8,8 +8,9 @@ alwaysApply: true
 
 ## Goal
 
-Correct implementation with minimal round-trips.
+Correct implementation with strict phase discipline.
 Think thoroughly before first edit. Internal reasoning is free — use it.
+**Never skip a phase gate. Never write code in the TEST phase.**
 
 ---
 
@@ -45,16 +46,21 @@ Rules:
 When: task is engineering-clear (spike done or was never needed).
 
 ```
-1. Write failing tests that define the contract
-2. Tests = specification (what, not how)
-3. Cover: happy path + error cases + edge cases
-4. Commit tests separately
+1. Write test files that define the contract
+2. Create ONLY stubs for imports (empty classes, NotImplementedError)
+3. Run tests — they MUST FAIL (red)
+4. ▶ STOP. Tell user: "tests ready for commit". Wait for commit.
 ```
 
 Rules:
 - Tests BEFORE any implementation code
 - Tests derive from spec, NOT from implementation
+- Stubs = minimum for pytest to collect (class/function signature only)
+- Stubs raise NotImplementedError — no logic, no implementation
+- Tests MUST fail. If tests pass — something is wrong
 - If you can't write the test, go back to SPIKE
+- After user commits tests — proceed to Phase 3
+- **Tests are immutable after commit. Never change tests to fit code.**
 - Refactor: deduplicate fixtures, extract helpers
 
 ### Phase 3: IMPLEMENT
@@ -62,11 +68,13 @@ Rules:
 ```
 1. Minimal code to pass all tests
 2. Run tests — all green
-3. Commit implementation separately
+3. ▶ STOP. Tell user: "implementation ready for commit". Wait for commit.
 ```
 
 Rules:
 - Minimal code — pass tests, nothing more
+- If test fails and test is correct — fix code, not test
+- If test has a genuine spec bug — document why, get user approval to change
 - Refactor: extract functions, rename for clarity, split large files
 
 ### Phase 4: VALIDATE
@@ -111,20 +119,17 @@ Is the task engineering-clear?
 
 ---
 
-## Before First Edit
+## Phase Gates (HARD STOPS)
 
-- Know the goal: read `PLAN.md` for current phase
-- Know the pattern: read existing module of the same kind
-- Know the contract: derive tests from spec
-- Know the constraints: RPi 4 = 8GB RAM, ARM64
+```
+SPIKE  → output: findings in PLAN.md          → STOP, user reviews
+TEST   → output: failing tests + stubs        → STOP, user commits
+IMPL   → output: passing tests                → STOP, user commits
+VALID  → output: lint clean, no regressions   → STOP, user reviews
+HARDEN → output: edge case tests + fixes      → STOP, user commits
+```
 
----
-
-## Constraints
-
-- File limits: ≤200 lines per file
-- Tests first: see `testing.mdc`
-- Validation: see `validation.mdc`
+**Never cross a gate without user acknowledgment.**
 
 ---
 

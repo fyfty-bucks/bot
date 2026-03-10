@@ -1,6 +1,7 @@
 secrets/
 !secrets/.gitkeep
-000/
+scripts/
+
 
 __pycache__/
 *.pyc

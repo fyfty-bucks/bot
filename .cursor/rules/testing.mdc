@@ -97,14 +97,27 @@ Developer writes `tests/`. Agent writes `tests/agent_tests/`. No overlap.
 
 ---
 
-## Commit Order
+## Commit Order (strict)
 
 ```
-1. Tests commit (tests fail)               ← Phase 2: spec
-2. Code commit (tests pass)                ← Phase 3: implement
-3. Refactor commit (after each phase)      ← cleanup
-4. Harden commit (edge cases + error tests)← Phase 5: harden
+1. Tests commit (tests FAIL)              ← Phase 2: spec is locked
+2. Code commit (tests PASS)               ← Phase 3: implementation
+3. Refactor commit                        ← cleanup (tests still pass)
+4. Harden commit (edge cases added)       ← Phase 5: harden
 ```
+
+**Tests are immutable after step 1.** Changing a test after commit
+requires explicit user approval and documented reason.
+
+---
+
+## Stubs (Phase 2 only)
+
+When tests import modules that don't exist yet:
+- Create the minimum file structure (empty `__init__.py`, class signatures)
+- All methods raise `NotImplementedError`
+- Stubs are NOT implementation — they exist only so pytest can collect
+- Stubs are replaced in Phase 3, not modified
 
 ---
 
@@ -114,6 +127,8 @@ Developer writes `tests/`. Agent writes `tests/agent_tests/`. No overlap.
 |-----|------|
 | Tests after code | Tests before code (TDD) |
 | Tests from implementation | Tests from spec |
+| Tests + code in same pass | Tests committed BEFORE code exists |
 | Can't write test → guess code | Can't write test → spike first |
+| Changing test to match code | Changing code to match test |
 | Happy path only | Test every error path |
 | `except Exception: pass` | Log and handle specifically |
