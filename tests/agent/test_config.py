@@ -65,6 +65,14 @@ def test_config_invalid_db_value_falls_back(test_db) -> None:
     assert cfg.budget_total == DEFAULTS["budget_total"]
 
 
+def test_config_logs_warning_on_coercion_fallback(test_db, caplog) -> None:
+    """Config.load() logs warning when type coercion fails for a key."""
+    ConfigEntry.upsert("budget_total", "not_a_number")
+    with caplog.at_level(logging.WARNING, logger="agent.config"):
+        Config.load(test_db)
+    assert any("budget_total" in r.message for r in caplog.records)
+
+
 def test_load_from_db_logs_on_error(test_db, caplog) -> None:
     """_load_from_db logs a warning when DB query fails."""
     test_db.close()

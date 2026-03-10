@@ -165,3 +165,37 @@ def test_log_indexes_nested_values(test_db) -> None:
     idx = EventIndex.get(EventIndex.rowid == event.id)
     assert "staging" in idx.text
     assert "{" not in idx.text
+
+
+def test_log_filters_none_from_index(test_db) -> None:
+    """None values are not indexed as the string 'None'."""
+    event = Event.log("test", {"key": None, "name": "alice"})
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert "None" not in idx.text
+    assert "alice" in idx.text
+
+
+def test_log_filters_booleans_from_index(test_db) -> None:
+    """Boolean values are not indexed as 'True' or 'False'."""
+    event = Event.log("test", {"active": True, "name": "bob"})
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert "True" not in idx.text
+    assert "bob" in idx.text
+
+
+def test_log_keeps_numbers_in_index(test_db) -> None:
+    """Numbers are indexed as strings (useful for version/amount search)."""
+    event = Event.log("test", {"version": "2.1", "count": 42})
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert "42" in idx.text
+    assert "2.1" in idx.text
+
+
+def test_log_caps_nested_flattening(test_db) -> None:
+    """FTS5 indexing stops recursing at depth limit to prevent stack overflow."""
+    nested = "deep_leaf_marker"
+    for _ in range(50):
+        nested = {"child": nested}
+    event = Event.log("deep", nested)
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert "deep_leaf_marker" not in idx.text

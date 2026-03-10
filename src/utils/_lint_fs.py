@@ -1,47 +1,37 @@
-"""Lint filesystem: .gitignore parsing and file collection."""
+"""Lint filesystem: gitignore-aware file collection."""
 
 from pathlib import Path
-from fnmatch import fnmatch
+
+import pathspec
 
 
-def parse_gitignore(root: Path) -> list[str]:
-    """Read .gitignore patterns from project root."""
+def load_gitignore(root: Path) -> pathspec.PathSpec:
+    """Load root .gitignore as a pathspec.PathSpec."""
     gi = root / ".gitignore"
     if not gi.exists():
-        return []
-    patterns = []
-    for line in gi.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and not line.startswith("!"):
-            patterns.append(line)
-    return patterns
+        return pathspec.PathSpec.from_lines("gitignore", [])
+    return pathspec.PathSpec.from_lines(
+        "gitignore",
+        gi.read_text().splitlines(),
+    )
 
 
-def is_ignored(path: Path, root: Path, patterns: list[str]) -> bool:
+def is_ignored(path: Path, root: Path, spec: pathspec.PathSpec) -> bool:
     """Check if path matches any .gitignore pattern."""
     rel = str(path.relative_to(root))
-    parts = path.relative_to(root).parts
-    for pat in patterns:
-        pat_clean = pat.rstrip("/")
-        if fnmatch(rel, pat_clean) or fnmatch(rel, pat_clean + "/**"):
-            return True
-        if any(fnmatch(p, pat_clean) for p in parts):
-            return True
-        for i in range(len(parts)):
-            sub = "/".join(parts[:i+1])
-            if fnmatch(sub, pat_clean) or fnmatch(sub + "/", pat):
-                return True
-    return False
+    return spec.match_file(rel)
 
 
-def collect_files(root: Path) -> list[Path]:
-    """Collect all lintable files, respecting .gitignore."""
-    patterns = parse_gitignore(root)
+def collect_files(target: Path, root: Path | None = None) -> list[Path]:
+    """Collect lintable files under target, respecting .gitignore from root."""
+    if root is None:
+        root = target
+    spec = load_gitignore(root)
     files = []
-    for p in sorted(root.rglob("*")):
+    for p in sorted(target.rglob("*")):
         if not p.is_file():
             continue
-        if is_ignored(p, root, patterns):
+        if is_ignored(p, root, spec):
             continue
         if p.suffix in (".py", ".md", ".mdc"):
             files.append(p)

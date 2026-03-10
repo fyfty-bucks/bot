@@ -57,3 +57,22 @@ def test_get_all_models_is_exported() -> None:
     from src.agent import db
     assert hasattr(db, "get_all_models"), "get_all_models must be exported"
     assert callable(db.get_all_models)
+
+
+def test_busy_timeout_is_set() -> None:
+    """busy_timeout pragma prevents instant SQLITE_BUSY on contention."""
+    db = get_db(":memory:")
+    cursor = db.execute_sql("PRAGMA busy_timeout")
+    value = cursor.fetchone()[0]
+    assert value >= 5000
+    db.close()
+
+
+def test_get_db_connect_idempotent() -> None:
+    """get_db() connection survives reuse_if_open reconnect."""
+    db = get_db(":memory:")
+    db.connect(reuse_if_open=True)
+    assert not db.is_closed()
+    cursor = db.execute_sql("SELECT 1")
+    assert cursor.fetchone()[0] == 1
+    db.close()

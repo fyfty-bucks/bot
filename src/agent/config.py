@@ -54,6 +54,10 @@ class Config:
                 try:
                     kwargs[f.name] = TYPE_MAP[f.name](raw)
                 except (ValueError, TypeError):
+                    logger.warning(
+                        "Invalid config value for %s: %r, using default",
+                        f.name, raw,
+                    )
                     kwargs[f.name] = default
             else:
                 kwargs[f.name] = default

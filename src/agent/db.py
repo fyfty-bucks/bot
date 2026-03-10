@@ -4,16 +4,20 @@ from playhouse.sqlite_ext import SqliteDatabase
 
 
 def get_db(path: str = "agent.db") -> SqliteDatabase:
-    """Create and return a configured SQLite connection."""
+    """Create and return a configured SQLite connection.
+
+    Caller is responsible for closing via db.close().
+    """
     db = SqliteDatabase(
         path,
         pragmas={
             "journal_mode": "wal",
             "foreign_keys": 1,
             "cache_size": -8000,
+            "busy_timeout": 5000,
         },
     )
-    db.connect()
+    db.connect(reuse_if_open=True)
     return db
 
 

@@ -6,10 +6,7 @@ alwaysApply: true
 
 # Vibe Coding
 
-## Goal
-
-Correct implementation with strict stage discipline.
-Think thoroughly before first edit. Internal reasoning is free — use it.
+Think thoroughly before first edit. Internal reasoning is free.
 **Never skip a stage gate.**
 
 ---
@@ -24,115 +21,54 @@ Think thoroughly before first edit. Internal reasoning is free — use it.
 
 ## Workflow
 
-Every feature goes through six stages.
-
 ```
 SPIKE → DESIGN → TEST → IMPLEMENT → VALIDATE → HARDEN
                    refactor ↻ after each phase
 ```
 
-### SPIKE (exploration)
+### SPIKE — when task is unclear or involves unknown API
 
-When: task is new, unclear, or involves unknown API/library.
+1. Throwaway script (`scripts/spike_*.py`), explore, document in PLAN.md, delete
+2. No tests, no quality. Goal: ambiguity → clarity
+3. Engineering-clear? → DESIGN. Unclear? → SPIKE the unclear part
 
-```
-1. Create throwaway script (scripts/spike_*.py)
-2. Explore: try API, read docs, test assumptions
-3. Document findings in PLAN.md
-4. Delete spike code
-```
+**GATE:** findings in PLAN.md → STOP, user reviews
 
-- No tests, no production quality. Goal: turn ambiguity into clarity.
-- If done → DESIGN. If can't proceed → document, revisit later.
+### DESIGN — when task is engineering-clear
 
-### DESIGN (interface contract)
+1. Define public signatures + error semantics
+2. Write stubs (`NotImplementedError` bodies)
+3. Interface principles in `interfaces.mdc`
 
-When: task is engineering-clear (spike done or was never needed).
+**GATE:** stubs with interfaces → STOP, user reviews
 
-```
-1. Define public method signatures (name, args, return type)
-2. Define error semantics (what raises, what returns)
-3. Review: would a caller find this intuitive?
-4. Write stubs (signatures + NotImplementedError bodies)
-```
+### TEST — specification as code
 
-- Interface principles in `interfaces.mdc`
-- Output: stubs that lock the API contract
-- ▶ STOP. Tell user: "interfaces designed". User reviews.
+1. Tests from spec, NOT from implementation — MUST FAIL (red)
+2. Can't write the test → go back to SPIKE
+3. **Tests are immutable after commit. Never change tests to fit code.**
 
-### TEST (specification)
+**GATE:** failing tests → STOP, user commits
 
-```
-1. Write test files that validate the contract from DESIGN
-2. Run tests — they MUST FAIL (red)
-3. ▶ STOP. Tell user: "tests ready for commit". Wait for commit.
-```
+### IMPLEMENT — minimal code to pass tests
 
-- Tests derive from spec, NOT from implementation
-- Tests MUST fail. If tests pass — something is wrong
-- If you can't write the test → go back to SPIKE
-- **Tests are immutable after commit. Never change tests to fit code.**
+1. Pass all tests, nothing more
+2. Test correct + code fails → fix code, not test
 
-### IMPLEMENT
-
-```
-1. Minimal code to pass all tests
-2. Run tests — all green
-3. ▶ STOP. Tell user: "implementation ready for commit".
-```
-
-- Minimal code — pass tests, nothing more
-- If test is correct and code fails — fix code, not test
-- If test has a genuine spec bug — document, get user approval
+**GATE:** passing tests → STOP, user commits
 
 ### VALIDATE
 
-```
-1. Run lint (./agent lint -v)
-2. Run full test suite
-3. Check no regressions, file limits ≤200 lines
-```
-
-- Fix any violations before proceeding
-- If file >200 lines, split now
+1. `./agent lint -v` + full test suite + no regressions
+2. Files >200 lines → split now
 
 ### HARDEN
 
-```
-1. Add edge case tests (bad input, timeout, unicode, concurrency)
-2. Add error handling to implementation
+1. Edge case tests: bad input, timeout, unicode, concurrency
+2. Error handling in implementation
 3. Re-run full suite, update PLAN.md
-```
 
-- Error paths tested, not just happy path
-
----
-
-## Decision: Spike or Design First?
-
-```
-Is the task engineering-clear?
-├── Yes → DESIGN
-├── No  → Is the domain known?
-│         ├── Yes → Quick spike (1-2 scripts)
-│         └── No  → Full spike (research + prototype)
-└── Partially → Spike the unclear part only
-```
-
----
-
-## Stage Gates (HARD STOPS)
-
-```
-SPIKE   → findings in PLAN.md          → STOP, user reviews
-DESIGN  → stubs with interfaces        → STOP, user reviews
-TEST    → failing tests + stubs        → STOP, user commits
-IMPL    → passing tests                → STOP, user commits
-VALID   → lint clean, no regressions   → STOP, user reviews
-HARDEN  → edge case tests + fixes      → STOP, user commits
-```
-
-**Never cross a gate without user acknowledgment.**
+**GATE:** edge case tests + fixes → STOP, user commits
 
 ---
 

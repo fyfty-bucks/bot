@@ -25,8 +25,19 @@ class AgentCore:
     """Event-triggered agent. Receives events, routes to handlers, stores results."""
 
     def __init__(self, db: SqliteDatabase) -> None:
+        self._validate_binding(db)
         self.db = db
         self.registry = HandlerRegistry()
+
+    @staticmethod
+    def _validate_binding(db: SqliteDatabase) -> None:
+        """Verify models are bound to the provided database."""
+        bound = Event._meta.database
+        if bound is None or bound is not db:
+            raise RuntimeError(
+                "Models not bound to this database. "
+                "Call create_tables(db, models) first."
+            )
 
     def receive(self, event_type: str, data: dict) -> Event:
         """Store an incoming event with FTS5 sync."""
@@ -37,13 +48,12 @@ class AgentCore:
     def execute(self, event: Event) -> HandleResult:
         """Route event to handler. Returns HandleResult with clear outcome."""
         data = json.loads(event.payload)
-        handler = self.registry.handlers.get(event.event_type)
 
-        if handler is None:
+        if event.event_type not in self.registry.handlers:
             return HandleResult(handled=False)
 
         try:
-            result = handler(data)
+            result = self.registry.route(event.event_type, data)
         except Exception as exc:
             logger.error("Handler error for %s: %s", event.event_type, exc)
             self._store_event("error", {

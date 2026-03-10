@@ -27,15 +27,17 @@ class ConfigEntry(peewee.Model):
 
     @classmethod
     def upsert(cls, key: str, value: object) -> "ConfigEntry":
-        """Insert or update a config entry."""
+        """Insert or update a config entry atomically."""
         json_val = json.dumps(value)
         now = datetime.now(timezone.utc)
-        entry, created = cls.get_or_create(
-            key=key,
-            defaults={"value": json_val, "updated_at": now},
-        )
-        if not created:
-            entry.value = json_val
-            entry.updated_at = now
-            entry.save()
+        db = cls._meta.database
+        with db.atomic():
+            entry, created = cls.get_or_create(
+                key=key,
+                defaults={"value": json_val, "updated_at": now},
+            )
+            if not created:
+                entry.value = json_val
+                entry.updated_at = now
+                entry.save()
         return entry

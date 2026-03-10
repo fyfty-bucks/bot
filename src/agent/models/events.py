@@ -7,12 +7,26 @@ import peewee
 from playhouse.sqlite_ext import FTS5Model, SearchField, RowIDField
 
 
-def _flatten_values(obj: object) -> str:
-    """Recursively extract leaf string values from nested structures."""
+_MAX_FLATTEN_DEPTH = 20
+
+
+def _flatten_values(obj: object, _depth: int = 0) -> str:
+    """Extract searchable text from nested structures for FTS5 index.
+
+    Skips None and booleans to avoid index noise.
+    Numbers are kept (version strings, amounts are useful for search).
+    Stops recursing at _MAX_FLATTEN_DEPTH to prevent stack overflow.
+    """
+    if _depth >= _MAX_FLATTEN_DEPTH:
+        return ""
+    if obj is None or isinstance(obj, bool):
+        return ""
     if isinstance(obj, dict):
-        return " ".join(_flatten_values(v) for v in obj.values())
+        parts = [_flatten_values(v, _depth + 1) for v in obj.values()]
+        return " ".join(p for p in parts if p)
     if isinstance(obj, (list, tuple)):
-        return " ".join(_flatten_values(v) for v in obj)
+        parts = [_flatten_values(v, _depth + 1) for v in obj]
+        return " ".join(p for p in parts if p)
     return str(obj)
 
 

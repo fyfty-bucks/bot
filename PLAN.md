@@ -27,7 +27,7 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 ## Rules Backlog
 
 - [ ] Morality clause → `core-constitution.md` (consensus required)
-- [ ] "Derived metrics: compute, never persist in files/code" → new rule
+- [x] "Derived metrics: compute, never persist in files/code" → coding-standards
 - [ ] Remove CHANGELOG.md references — git history is the changelog
 - [ ] Skills = markdown (non-deterministic), src = code (deterministic)
 
@@ -42,29 +42,27 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 
 ## Phase 1: Core + DB ← CURRENT
 
-**Spike:** done
-**Design:** done (Task state machine, BudgetLog.record, Event.log, Config.load, HandleResult)
-**Test:** 92 tests (61 green, 31 red — stubs await implementation)
-**Implement:** in progress
+**Stages:** spike, design, test, implement, validate — done
 
-**Harden** (data integrity — must fix before real money flows):
-- [ ] `db.atomic()` transactions in `AgentCore.receive()` + `execute()`
-- [ ] `BudgetLog.balance_after` auto-calculated ← tests ready
-- [ ] `Task.status` state machine ← tests ready
-- [ ] Event → EventIndex auto-sync via `Event.log()` ← tests ready
-- [ ] `ConfigEntry` type coercion with fallback ← tests ready
-- [x] `execute()` returns `HandleResult` (no handler / success / error)
-- [x] Edge case tests: empty payload, huge payload, unicode
-- [ ] Watchdog — deferred to Phase 4
+**Harden:** done. Deferred to future phases:
+- [ ] `db.atomic()` in `AgentCore.execute()` — LLM phase
+- [ ] `BudgetLog.record()` race condition — crypto phase
+- [ ] `BudgetLog` float → Decimal — crypto phase
+- [ ] Watchdog — Phase 4
 
-**Refactor** (before Phase 2):
-- [ ] `pyproject.toml` (metadata, pytest pythonpath)
+**Harden (audit, completed):**
+- [x] Linter: full test coverage, single AST parse, DRY, secret patterns
+- [x] `Config.load()` logs warning on coercion fallback
+- [x] `AgentCore.execute()` uses `registry.route()` API
+- [x] `_flatten_values()` depth limit (prevent stack overflow)
+- [x] `get_db()` safe connect + close contract
+- [x] `pyproject.toml` single dependency source (removed requirements.txt)
+- [x] DRY rule added to coding standards
+- [x] Rules trimmed for context efficiency
+
+**Refactor:** remaining:
 - [ ] `dev` branch, move work off `main`
-- [ ] `Config.load(db)` classmethod factory ← tests ready
-- [ ] `db.ALL_MODELS` lazy (function, not constant)
-- [ ] `./agent` venv-aware for RPi
 - [ ] Split `_lint_core.py` (extract secret scanner)
-- [x] CLI integration tests
 - [ ] `info` command: actual DB stats
 
 ## Phase 2: LLM Integration
@@ -132,9 +130,8 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 
 ## Current
 
-**Phase:** 1 — Core + DB / IMPLEMENT (31 stubs → code)
-**Tests:** 92 (61 green, 31 red)
-**Next:** implement, validate, Phase 2 spike
+**Phase:** 1 — Core + DB / HARDEN complete
+**Next:** remaining refactors, then Phase 2 spike (OpenRouter LLM)
 
 ---
 

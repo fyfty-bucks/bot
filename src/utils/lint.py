@@ -6,7 +6,7 @@ from src.utils._lint_core import (
     LintResult, FileReport,
     analyze_py, analyze_md,
 )
-from src.utils._lint_fs import parse_gitignore, is_ignored, collect_files
+from src.utils._lint_fs import load_gitignore, is_ignored, collect_files
 from src.utils._lint_report import format_report
 
 
@@ -22,13 +22,8 @@ def lint_path(target: Path, root: Path | None = None) -> list[FileReport]:
             return [analyze_md(target)]
         return []
 
-    patterns = parse_gitignore(root)
     reports: list[FileReport] = []
-    for p in sorted(target.rglob("*")):
-        if not p.is_file():
-            continue
-        if is_ignored(p, root, patterns):
-            continue
+    for p in collect_files(target, root):
         if p.suffix == ".py":
             reports.append(analyze_py(p))
         elif p.suffix in (".md", ".mdc"):
@@ -39,6 +34,6 @@ def lint_path(target: Path, root: Path | None = None) -> list[FileReport]:
 __all__ = [
     "LintResult", "FileReport",
     "analyze_py", "analyze_md",
-    "parse_gitignore", "is_ignored", "collect_files",
+    "load_gitignore", "is_ignored", "collect_files",
     "format_report", "lint_path",
 ]

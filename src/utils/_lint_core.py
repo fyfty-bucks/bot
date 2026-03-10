@@ -48,11 +48,15 @@ _SECRET_PATTERNS = [
     re.compile(r'(?i)private[_\s]?key\s*=\s*["\'][^"\']+["\']'),
     re.compile(r'(?i)secret\s*=\s*["\'][^"\']+["\']'),
     re.compile(r'(?i)api[_\s]?key\s*=\s*["\'][^"\']+["\']'),
+    re.compile(r'AKIA[0-9A-Z]{16}'),
+    re.compile(r'ghp_[a-zA-Z0-9]{36,}'),
+    re.compile(r'gho_[a-zA-Z0-9]{36,}'),
+    re.compile(r'github_pat_[a-zA-Z0-9_]{22,}'),
 ]
 
 
 def _is_test_file(path: Path) -> bool:
-    """Check if file is a test file (skip secret scanning)."""
+    """Check if file is in test context (skip secret scanning)."""
     parts = path.parts
     return path.name.startswith("test_") or any(p == "tests" for p in parts)
 
@@ -73,14 +77,31 @@ def _check_secrets(content: str, path: Path) -> list[LintResult]:
     return hits
 
 
-def _parse_py(content: str) -> tuple[list, list, int, bool]:
-    """Parse Python AST: returns (classes, func_sizes, imports, has_docstring)."""
-    tree = ast.parse(content)
+def _extract_metrics(tree: ast.Module) -> tuple[list[str], int, int, int, bool]:
+    """Extract lint metrics from parsed AST.
+
+    Returns (class_names, func_count, max_func_lines, imports, has_docstring).
+    func_count = top-level + class methods (module API surface).
+    max_func_lines = longest function at any depth (complexity check).
+    """
     classes = [n.name for n in tree.body if isinstance(n, ast.ClassDef)]
-    func_sizes = []
+
+    func_count = 0
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            func_count += 1
+        elif isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    func_count += 1
+
+    max_func_lines = 0
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            func_sizes.append(node.end_lineno - node.lineno + 1)
+            size = node.end_lineno - node.lineno + 1
+            if size > max_func_lines:
+                max_func_lines = size
+
     imports = sum(
         len(n.names) for n in ast.walk(tree)
         if isinstance(n, (ast.Import, ast.ImportFrom))
@@ -91,23 +112,24 @@ def _parse_py(content: str) -> tuple[list, list, int, bool]:
         and isinstance(tree.body[0].value, ast.Constant)
         and isinstance(tree.body[0].value.value, str)
     )
-    return classes, func_sizes, imports, has_doc
+    return classes, func_count, max_func_lines, imports, has_doc
 
 
-def _check_type_hints(content: str, path: str) -> list[LintResult]:
-    """Check public functions have return type annotation."""
-    try:
-        tree = ast.parse(content)
-    except SyntaxError:
-        return []
+def _check_type_hints(tree: ast.Module, path: str) -> list[LintResult]:
+    """Check public functions have return type annotation.
+
+    Checks module-level functions and class methods only.
+    """
     missing = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if node.name.startswith("_"):
-            continue
-        if node.returns is None:
-            missing.append(node.name)
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not node.name.startswith("_") and node.returns is None:
+                missing.append(node.name)
+        elif isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if not item.name.startswith("_") and item.returns is None:
+                        missing.append(item.name)
     if missing:
         names = ", ".join(missing[:5])
         suffix = f" +{len(missing)-5}" if len(missing) > 5 else ""
@@ -121,15 +143,15 @@ def _check_type_hints(content: str, path: str) -> list[LintResult]:
 def analyze_py(path: Path) -> FileReport:
     """Analyze Python file against coding standards."""
     content = path.read_text(encoding="utf-8")
-    lines = content.rstrip("\n").count("\n") + 1 if content else 0
+    lines = len(content.splitlines())
     p = str(path)
 
     try:
-        classes, func_sizes, imports, has_doc = _parse_py(content)
+        tree = ast.parse(content)
     except SyntaxError:
         return FileReport(path, lines, [LintResult(p, "syntax", 0, 0, False)])
 
-    max_func = max(func_sizes) if func_sizes else 0
+    classes, func_count, max_func, imports, has_doc = _extract_metrics(tree)
     parts = path.parts
     in_tests = any(part == "tests" for part in parts)
 
@@ -140,8 +162,8 @@ def analyze_py(path: Path) -> FileReport:
 
     results = [
         LintResult(p, "lines", lines, lim["lines"], lines <= lim["lines"]),
-        LintResult(p, "functions", len(func_sizes), lim["functions"],
-                   len(func_sizes) <= lim["functions"]),
+        LintResult(p, "functions", func_count, lim["functions"],
+                   func_count <= lim["functions"]),
         LintResult(p, "classes", len(classes), lim["classes"],
                    len(classes) <= lim["classes"]),
         LintResult(p, "func_lines", max_func, lim["func_lines"],
@@ -151,7 +173,7 @@ def analyze_py(path: Path) -> FileReport:
         LintResult(p, "docstring", 1 if has_doc else 0, 1,
                    has_doc or lines == 0),
     ]
-    results.extend(_check_type_hints(content, p))
+    results.extend(_check_type_hints(tree, p))
     results.extend(_check_secrets(content, path))
     return FileReport(path, lines, results)
 
@@ -159,7 +181,7 @@ def analyze_py(path: Path) -> FileReport:
 def analyze_md(path: Path) -> FileReport:
     """Analyze Markdown/MDC file."""
     content = path.read_text(encoding="utf-8")
-    lines = content.rstrip("\n").count("\n") + 1 if content else 0
+    lines = len(content.splitlines())
     p = str(path)
     results = [
         LintResult(p, "lines", lines, MD_LIMITS["lines"],

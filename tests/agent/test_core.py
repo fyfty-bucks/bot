@@ -3,6 +3,9 @@
 import json
 from unittest.mock import patch
 
+import pytest
+from playhouse.sqlite_ext import SqliteDatabase
+
 from src.agent.core import AgentCore, HandleResult
 from src.agent.models.events import Event, EventIndex
 
@@ -191,3 +194,20 @@ def test_execute_survives_result_storage_failure(test_db) -> None:
     assert isinstance(hr, HandleResult)
     assert hr.handled is True
     assert hr.result == {"ok": True}
+
+
+def test_agent_core_rejects_unbound_db(test_db) -> None:
+    """AgentCore raises RuntimeError when models not bound to provided db."""
+    other_db = SqliteDatabase(":memory:")
+    other_db.connect()
+    try:
+        with pytest.raises(RuntimeError):
+            AgentCore(other_db)
+    finally:
+        other_db.close()
+
+
+def test_agent_core_accepts_bound_db(test_db) -> None:
+    """AgentCore accepts db that models are already bound to."""
+    core = AgentCore(test_db)
+    assert core.db is test_db

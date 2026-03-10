@@ -27,13 +27,10 @@ LLM-optimized codebase. Small files, typed interfaces, no leaked secrets.
 - Module docstring required for every .py file
 - Type hints required on public function signatures (not `_private`)
 - Linter reads .gitignore and skips excluded paths
+- DRY: single source of truth per concept — no duplicated logic between modules
+- Derived metrics (test count, pass rate, line count) — compute on demand, never persist in files or code
 
----
+## When limit exceeded
 
-## When lines > limit
-
-Split into submodules with single responsibility.
-
-## When functions > limit
-
-Extract to separate module.
+- lines → split into submodules with single responsibility
+- functions → extract to separate module

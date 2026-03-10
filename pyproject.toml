@@ -1,0 +1,23 @@
+[project]
+name = "50bucks"
+version = "0.1.0"
+description = "Autonomous AI agent on Raspberry Pi 4"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "peewee>=4.0.0",
+    "pathspec>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.28.0",
+]
+
+[project.scripts]
+agent = "src.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
