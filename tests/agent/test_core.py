@@ -1,9 +1,10 @@
 """Tests for core agent loop — receive, route, execute with HandleResult."""
 
 import json
+from unittest.mock import patch
 
 from src.agent.core import AgentCore, HandleResult
-from src.agent.models.events import Event
+from src.agent.models.events import Event, EventIndex
 
 
 def _ok_handler(event_data: dict) -> dict:
@@ -133,9 +134,6 @@ def test_full_cycle(test_db) -> None:
     assert result["pong"] is True
 
 
-# --- Edge cases ---
-
-
 def test_receive_empty_data(test_db) -> None:
     """receive() with empty dict stores valid event."""
     core = AgentCore(test_db)
@@ -163,3 +161,33 @@ def test_receive_large_data(test_db) -> None:
 
     loaded = Event.get_by_id(event.id)
     assert json.loads(loaded.payload) == data
+
+
+def test_receive_syncs_to_fts5(test_db) -> None:
+    """receive() creates event AND syncs to FTS5 index."""
+    core = AgentCore(test_db)
+    event = core.receive("search_test", {"desc": "findable content"})
+
+    results = list(EventIndex.search_bm25("findable").limit(5))
+    assert len(results) >= 1
+
+
+def test_execute_survives_result_storage_failure(test_db) -> None:
+    """execute() returns HandleResult even if result event storage fails."""
+    core = AgentCore(test_db)
+    core.registry.register("echo", lambda d: {"ok": True})
+    event = core.receive("echo", {"data": 1})
+
+    real_create = Event.create
+
+    def failing_on_result(**kwargs):
+        if kwargs.get("event_type") == "handler_result":
+            raise Exception("storage failed")
+        return real_create(**kwargs)
+
+    with patch.object(Event, "create", side_effect=failing_on_result):
+        hr = core.execute(event)
+
+    assert isinstance(hr, HandleResult)
+    assert hr.handled is True
+    assert hr.result == {"ok": True}

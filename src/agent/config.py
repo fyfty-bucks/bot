@@ -1,10 +1,12 @@
 """Agent configuration — defaults + DB overrides + env overrides."""
 
+import logging
 import os
 from dataclasses import dataclass, fields, field
 
 from playhouse.sqlite_ext import SqliteDatabase
 
+logger = logging.getLogger("agent.config")
 
 DEFAULTS = {
     "model_fast": "haiku",
@@ -12,6 +14,14 @@ DEFAULTS = {
     "budget_total": 50.0,
     "log_level": "INFO",
     "db_path": "agent.db",
+}
+
+TYPE_MAP: dict[str, type] = {
+    "model_fast": str,
+    "model_smart": str,
+    "budget_total": float,
+    "log_level": str,
+    "db_path": str,
 }
 
 ENV_PREFIX = "AGENT_"
@@ -30,17 +40,34 @@ class Config:
     @classmethod
     def load(cls, db: SqliteDatabase | None = None) -> "Config":
         """Load config: env > db > defaults. Type coercion with fallback."""
-        raise NotImplementedError
+        db_values = _load_from_db(db) if db else {}
+        kwargs: dict[str, object] = {}
+        for f in fields(cls):
+            default = DEFAULTS[f.name]
+            raw = db_values.get(f.name)
+            env_key = f"{ENV_PREFIX}{f.name.upper()}"
+            env_val = os.environ.get(env_key)
+
+            if env_val is not None:
+                raw = env_val
+            if raw is not None:
+                try:
+                    kwargs[f.name] = TYPE_MAP[f.name](raw)
+                except (ValueError, TypeError):
+                    kwargs[f.name] = default
+            else:
+                kwargs[f.name] = default
+        return cls(**kwargs)
 
 
-def _load_from_db(db: SqliteDatabase) -> dict[str, str]:
+def _load_from_db(db: SqliteDatabase) -> dict[str, object]:
     """Read all config entries from DB as a flat dict."""
     from src.agent.models.config_store import ConfigEntry
 
     result = {}
     try:
         for entry in ConfigEntry.select():
-            result[entry.key] = entry.value
+            result[entry.key] = entry.get_value()
     except Exception:
-        pass
+        logger.warning("Failed to load config from DB", exc_info=True)
     return result

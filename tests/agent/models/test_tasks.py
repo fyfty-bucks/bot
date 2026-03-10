@@ -122,9 +122,6 @@ def test_task_input_output_json(test_db) -> None:
     assert loaded.get_output() == out
 
 
-# --- Edge cases ---
-
-
 def test_task_unicode_input(test_db) -> None:
     """Task with unicode input round-trips correctly."""
     data = {"prompt": "Переведи текст", "lang": "ru"}
@@ -140,3 +137,12 @@ def test_task_empty_input(test_db) -> None:
     """Task with empty input_data default works."""
     task = Task.create(task_type="health_check")
     assert task.get_input() == {}
+
+
+def test_terminal_states_explicit() -> None:
+    """Terminal states (completed, failed) are explicit keys in VALID_TRANSITIONS."""
+    from src.agent.models.tasks import VALID_TRANSITIONS
+    assert "completed" in VALID_TRANSITIONS
+    assert "failed" in VALID_TRANSITIONS
+    assert VALID_TRANSITIONS["completed"] == set()
+    assert VALID_TRANSITIONS["failed"] == set()

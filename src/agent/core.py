@@ -29,11 +29,8 @@ class AgentCore:
         self.registry = HandlerRegistry()
 
     def receive(self, event_type: str, data: dict) -> Event:
-        """Store an incoming event and return the Event record."""
-        event = Event.create(
-            event_type=event_type,
-            payload=json.dumps(data),
-        )
+        """Store an incoming event with FTS5 sync."""
+        event = Event.log(event_type, data)
         logger.debug("Received event %s id=%d", event_type, event.id)
         return event
 
@@ -49,20 +46,21 @@ class AgentCore:
             result = handler(data)
         except Exception as exc:
             logger.error("Handler error for %s: %s", event.event_type, exc)
-            Event.create(
-                event_type="error",
-                payload=json.dumps({
-                    "source_event_id": event.id,
-                    "source_event_type": event.event_type,
-                    "error": str(exc),
-                }),
-            )
+            self._store_event("error", {
+                "source_event_id": event.id,
+                "source_event_type": event.event_type,
+                "error": str(exc),
+            })
             return HandleResult(handled=True, error=str(exc))
 
         if result is not None:
-            Event.create(
-                event_type="handler_result",
-                payload=json.dumps(result),
-            )
+            self._store_event("handler_result", result)
 
         return HandleResult(handled=True, result=result)
+
+    def _store_event(self, event_type: str, data: dict) -> None:
+        """Best-effort event storage. Logs failure instead of crashing."""
+        try:
+            Event.log(event_type, data)
+        except Exception as exc:
+            logger.error("Failed to store %s event: %s", event_type, exc)

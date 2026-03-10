@@ -1,8 +1,33 @@
-"""Tests for BudgetLog model — record() with auto-balance."""
+"""Tests for BudgetLog model — CRUD basics + record() with auto-balance."""
+
+from datetime import datetime
 
 import peewee as pw
 
 from src.agent.models.budget import BudgetLog
+
+
+def test_create_budget_entry_direct(test_db) -> None:
+    """Direct create() stores and retrieves all fields correctly."""
+    entry = BudgetLog.create(
+        amount=-0.01, category="llm",
+        description="test call", balance_after=49.99,
+    )
+    loaded = BudgetLog.get_by_id(entry.id)
+    assert loaded.amount == -0.01
+    assert loaded.category == "llm"
+    assert loaded.description == "test call"
+    assert loaded.balance_after == 49.99
+    assert isinstance(loaded.created_at, datetime)
+
+
+def test_budget_model_defaults(test_db) -> None:
+    """Default description is empty string, created_at is auto-set."""
+    entry = BudgetLog.create(
+        amount=50.0, category="initial", balance_after=50.0,
+    )
+    assert entry.description == ""
+    assert entry.created_at is not None
 
 
 def test_record_creates_entry(test_db) -> None:
@@ -79,9 +104,6 @@ def test_filter_by_category(test_db) -> None:
         BudgetLog.select().where(BudgetLog.category == "llm")
     )
     assert len(llm_entries) == 2
-
-
-# --- Edge cases ---
 
 
 def test_record_zero_amount(test_db) -> None:

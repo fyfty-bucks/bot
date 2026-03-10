@@ -1,0 +1,52 @@
+# Post-Implementation Quality Gates
+
+## Principle
+
+After IMPLEMENT, every module goes through three passes: edge cases, hardening, refactoring.
+Each pass produces failing tests first, then fixes.
+
+---
+
+## Edge Cases
+
+Test every input boundary the happy path ignores:
+
+- Empty, null, zero, negative, maximum values
+- Unicode, special characters, whitespace-only strings
+- Nested/recursive structures where flat is assumed
+- Concurrent access to shared mutable state
+
+## Hardening
+
+Test system-level integrity:
+
+- **Atomicity**: multi-step DB ops wrapped in `db.atomic()`; force last step to fail, verify rollback
+- **Error visibility**: every `except` must log or re-raise; zero tolerance for silent `pass`
+- **Serialization roundtrip**: `write(x)` then `read()` preserves type and value
+- **Pipeline completeness**: data created via primary API reaches all stores (DB, index, cache)
+- **Fault isolation**: one broken plugin/module does not crash the entire loader
+- **State machines**: every valid state (including terminal) is an explicit key in the transition map
+
+## Refactoring
+
+Clean up without changing behavior:
+
+- Names match behavior (lazy = function, eager = constant)
+- No runtime introspection that breaks under `from __future__ import annotations`
+- Public API exports match intended usage
+- Module-level side effects eliminated (imports should not trigger computation)
+
+---
+
+## Test Style
+
+- No section separator comments in test files (`# --- Edge cases ---` etc.)
+- Tests are self-documenting via docstrings; grouping is visual noise
+- New tests go at the end of the file, no ceremony
+
+---
+
+## When
+
+After IMPLEMENT tests pass (green), before VALIDATE.
+Each quality gate item must have a failing test before the fix is written.

@@ -13,6 +13,8 @@ class InvalidTransition(Exception):
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"running"},
     "running": {"completed", "failed"},
+    "completed": set(),
+    "failed": set(),
 }
 
 
@@ -41,9 +43,19 @@ class Task(peewee.Model):
         """Deserialize output JSON, or None."""
         return json.loads(self.output_data) if self.output_data else None
 
+    def _transition(self, target: str) -> None:
+        """Validate and apply a status transition."""
+        allowed = VALID_TRANSITIONS.get(self.status, set())
+        if target not in allowed:
+            raise InvalidTransition(
+                f"{self.status} -> {target} is not allowed"
+            )
+        self.status = target
+
     def start(self) -> None:
         """Transition pending -> running."""
-        raise NotImplementedError
+        self._transition("running")
+        self.save()
 
     def complete(
         self,
@@ -51,8 +63,17 @@ class Task(peewee.Model):
         cost_usd: float | None = None,
     ) -> None:
         """Transition running -> completed."""
-        raise NotImplementedError
+        self._transition("completed")
+        self.completed_at = datetime.now(timezone.utc)
+        if output is not None:
+            self.output_data = json.dumps(output)
+        if cost_usd is not None:
+            self.cost_usd = cost_usd
+        self.save()
 
     def fail(self, error: str) -> None:
         """Transition running -> failed."""
-        raise NotImplementedError
+        self._transition("failed")
+        self.completed_at = datetime.now(timezone.utc)
+        self.error = error
+        self.save()

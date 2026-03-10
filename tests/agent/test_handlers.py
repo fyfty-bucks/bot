@@ -77,3 +77,24 @@ def test_discover_handlers_from_package(tmp_path) -> None:
 
     result = reg.route("ping", {})
     assert result == {"pong": True}
+
+
+def test_discover_survives_bad_module(tmp_path) -> None:
+    """Discovery continues past modules with import errors."""
+    pkg = tmp_path / "handlers"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+
+    (pkg / "aaa_broken.py").write_text(
+        "import nonexistent_module_xyz_123\n"
+        'name = "broken"\n'
+        "def handle(data): pass\n"
+    )
+    (pkg / "zzz_good.py").write_text(
+        'name = "good"\n'
+        "def handle(data): return {}\n"
+    )
+
+    reg = HandlerRegistry()
+    reg.discover(str(pkg))
+    assert "good" in reg.handlers

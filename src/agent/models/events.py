@@ -7,6 +7,15 @@ import peewee
 from playhouse.sqlite_ext import FTS5Model, SearchField, RowIDField
 
 
+def _flatten_values(obj: object) -> str:
+    """Recursively extract leaf string values from nested structures."""
+    if isinstance(obj, dict):
+        return " ".join(_flatten_values(v) for v in obj.values())
+    if isinstance(obj, (list, tuple)):
+        return " ".join(_flatten_values(v) for v in obj)
+    return str(obj)
+
+
 class Event(peewee.Model):
     """Core event-sourced log. Every agent action becomes an event."""
 
@@ -26,8 +35,20 @@ class Event(peewee.Model):
 
     @classmethod
     def log(cls, event_type: str, payload: dict) -> "Event":
-        """Create event and sync to FTS5 index."""
-        raise NotImplementedError
+        """Create event and sync to FTS5 index atomically."""
+        db = cls._meta.database
+        with db.atomic():
+            event = cls.create(
+                event_type=event_type,
+                payload=json.dumps(payload),
+            )
+            text = _flatten_values(payload)
+            EventIndex.insert({
+                EventIndex.rowid: event.id,
+                EventIndex.text: text,
+                EventIndex.event_type: event_type,
+            }).execute()
+        return event
 
 
 class EventIndex(FTS5Model):

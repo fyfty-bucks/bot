@@ -28,7 +28,7 @@ class ConfigEntry(peewee.Model):
     @classmethod
     def upsert(cls, key: str, value: object) -> "ConfigEntry":
         """Insert or update a config entry."""
-        json_val = json.dumps(value) if not isinstance(value, str) else value
+        json_val = json.dumps(value)
         now = datetime.now(timezone.utc)
         entry, created = cls.get_or_create(
             key=key,

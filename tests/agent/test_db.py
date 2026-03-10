@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.agent.db import get_db, create_tables, ALL_MODELS
+from src.agent.db import get_db, create_tables, get_all_models
 
 
 def test_get_db_returns_connection() -> None:
@@ -34,18 +34,26 @@ def test_foreign_keys_enabled() -> None:
 def test_create_tables_idempotent() -> None:
     """Calling create_tables twice does not raise."""
     db = get_db(":memory:")
-    create_tables(db, ALL_MODELS)
-    create_tables(db, ALL_MODELS)
+    create_tables(db, get_all_models())
+    create_tables(db, get_all_models())
     db.close()
 
 
 def test_migrate_adds_missing_tables() -> None:
     """All model tables exist after create_tables on empty DB."""
     db = get_db(":memory:")
-    create_tables(db, ALL_MODELS)
+    models = get_all_models()
+    create_tables(db, models)
     tables = db.get_tables()
     assert len(tables) > 0
-    for model in ALL_MODELS:
+    for model in models:
         table_name = model._meta.table_name
         assert table_name in tables, f"Missing table: {table_name}"
     db.close()
+
+
+def test_get_all_models_is_exported() -> None:
+    """get_all_models is a public function, not a module-level constant."""
+    from src.agent import db
+    assert hasattr(db, "get_all_models"), "get_all_models must be exported"
+    assert callable(db.get_all_models)

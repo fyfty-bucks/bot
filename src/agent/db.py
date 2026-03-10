@@ -23,12 +23,9 @@ def create_tables(db: SqliteDatabase, models: list) -> None:
     db.create_tables(models, safe=True)
 
 
-def _get_all_models() -> list:
+def get_all_models() -> list:
     """Import and return all model classes. Lazy to avoid circular imports."""
     from src.agent.models import (
         Event, EventIndex, BudgetLog, Task, ConfigEntry,
     )
     return [Event, EventIndex, BudgetLog, Task, ConfigEntry]
-
-
-ALL_MODELS: list = _get_all_models()

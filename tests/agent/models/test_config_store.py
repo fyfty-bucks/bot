@@ -9,7 +9,7 @@ def test_set_config_value(test_db) -> None:
     """Store and retrieve a config value."""
     ConfigEntry.upsert("model_name", "haiku")
     entry = ConfigEntry.get_by_id("model_name")
-    assert entry.value == "haiku"
+    assert entry.get_value() == "haiku"
 
 
 def test_get_config_missing_returns_none(test_db) -> None:
@@ -26,7 +26,7 @@ def test_update_config_value(test_db) -> None:
 
     ConfigEntry.upsert("model_name", "sonnet")
     second = ConfigEntry.get_by_id("model_name")
-    assert second.value == "sonnet"
+    assert second.get_value() == "sonnet"
     assert second.updated_at >= first_ts
 
 
@@ -48,4 +48,13 @@ def test_config_key_is_unique(test_db) -> None:
     assert count == 1
 
     entry = ConfigEntry.get_by_id("key1")
-    assert entry.value == "second"
+    assert entry.get_value() == "second"
+
+
+def test_upsert_string_preserves_type(test_db) -> None:
+    """String '42' stored via upsert returns string '42', not int 42."""
+    ConfigEntry.upsert("port", "42")
+    entry = ConfigEntry.get_by_id("port")
+    val = entry.get_value()
+    assert val == "42"
+    assert isinstance(val, str)

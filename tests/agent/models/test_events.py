@@ -2,6 +2,9 @@
 
 import json
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
+
+import pytest
 
 from src.agent.models.events import Event, EventIndex
 
@@ -108,9 +111,6 @@ def test_fts5_search_ranked(test_db) -> None:
     assert "deploy" in results[0].text
 
 
-# --- Edge cases ---
-
-
 def test_event_empty_payload(test_db) -> None:
     """Event with empty dict payload stores and retrieves correctly."""
     event = Event.create(event_type="empty", payload=json.dumps({}))
@@ -146,3 +146,22 @@ def test_log_unicode_payload(test_db) -> None:
     Event.log("msg", {"text": "Привет мир, это агент"})
     results = list(EventIndex.search_bm25("агент").limit(5))
     assert len(results) >= 1
+
+
+def test_log_atomic_on_index_failure(test_db) -> None:
+    """If FTS5 indexing fails, Event.log() rolls back Event creation."""
+    with patch.object(EventIndex, "insert", side_effect=Exception("FTS5 err")):
+        with pytest.raises(Exception, match="FTS5 err"):
+            Event.log("test_event", {"data": "value"})
+
+    assert Event.select().count() == 0
+
+
+def test_log_indexes_nested_values(test_db) -> None:
+    """Event.log() extracts nested dict values cleanly for FTS5."""
+    payload = {"meta": {"env": "staging", "version": "2.1"}}
+    event = Event.log("deploy", payload)
+
+    idx = EventIndex.get(EventIndex.rowid == event.id)
+    assert "staging" in idx.text
+    assert "{" not in idx.text
