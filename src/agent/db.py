@@ -5,12 +5,30 @@ from playhouse.sqlite_ext import SqliteDatabase
 
 def get_db(path: str = "agent.db") -> SqliteDatabase:
     """Create and return a configured SQLite connection."""
-    raise NotImplementedError
+    db = SqliteDatabase(
+        path,
+        pragmas={
+            "journal_mode": "wal",
+            "foreign_keys": 1,
+            "cache_size": -8000,
+        },
+    )
+    db.connect()
+    return db
 
 
 def create_tables(db: SqliteDatabase, models: list) -> None:
-    """Create all tables if they don't exist."""
-    raise NotImplementedError
+    """Create all tables if they don't exist. Safe to call repeatedly."""
+    db.bind(models)
+    db.create_tables(models, safe=True)
 
 
-ALL_MODELS: list = []
+def _get_all_models() -> list:
+    """Import and return all model classes. Lazy to avoid circular imports."""
+    from src.agent.models import (
+        Event, EventIndex, BudgetLog, Task, ConfigEntry,
+    )
+    return [Event, EventIndex, BudgetLog, Task, ConfigEntry]
+
+
+ALL_MODELS: list = _get_all_models()

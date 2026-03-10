@@ -42,20 +42,18 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 
 ## Phase 1: Core + DB ← CURRENT
 
-**Spike (done):**
-- [x] Research AI agent architectures (Hermes, ACE, OpenClaw, Ouroboros)
-- [x] Vector DB ARM64 compat — LanceDB chosen (ARM64 wheels, embedded)
-- [x] FTS5 via Peewee validated — 0.3ms search, 48KB for 100 entries
+**Spike:** done
+**Test:** done (51 tests)
+**Implement:** done (9 modules)
 
-**Build:**
-- [ ] `requirements.txt` (peewee, httpx, pytest)
-- [ ] SQLite schema: events, tasks, budget_log, config
-- [ ] Peewee models + migration support
-- [ ] Agent config module (`src/agent/config.py`)
-- [ ] Logging (file + stdout, standard `logging`)
-- [ ] Core loop skeleton: receive → analyze → execute → store
-- [ ] Modular handler registry (plugin pattern)
-- [ ] Watchdog (process-level, restart on hang)
+**Harden:**
+- [ ] Validate task status transitions (pending→running→completed/failed)
+- [ ] Auto-sync Event → EventIndex (FTS5) on create
+- [ ] `db.atomic()` transactions in core loop
+- [ ] Budget balance auto-calculation on insert
+- [ ] ConfigEntry type coercion (str "50.0" → float 50.0)
+- [ ] Edge case tests: empty payload, huge payload, unicode
+- [ ] Watchdog (process-level, restart on hang) — deferred to Phase 4
 
 ## Phase 2: LLM Integration
 
@@ -123,8 +121,8 @@ End goal: state of autonomous AI agents that collaborate with humans as equals; 
 ## Current
 
 **Phase:** 1 — Core + DB
-**Task:** Build — TDD for DB models
-**Next:** Tests for SQLite schema + Peewee models
+**Task:** Harden — edge cases, validation, transactions
+**Next:** Phase 2 spike (OpenRouter API)
 
 ---
 

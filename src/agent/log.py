@@ -1,6 +1,9 @@
-"""Structured logging setup — stub for TDD Phase 2."""
+"""Structured logging setup — file + stdout."""
 
 import logging
+
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+LOG_NAME = "agent"
 
 
 def setup_logging(
@@ -8,4 +11,19 @@ def setup_logging(
     log_file: str | None = None,
 ) -> logging.Logger:
     """Configure and return the agent logger."""
-    raise NotImplementedError
+    logger = logging.getLogger(LOG_NAME)
+    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
+    logger.handlers.clear()
+
+    formatter = logging.Formatter(LOG_FORMAT)
+
+    stdout = logging.StreamHandler()
+    stdout.setFormatter(formatter)
+    logger.addHandler(stdout)
+
+    if log_file:
+        fh = logging.FileHandler(log_file)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
+    return logger

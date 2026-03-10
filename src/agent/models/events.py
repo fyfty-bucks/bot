@@ -1,22 +1,32 @@
-"""Event and FTS5 index models — stubs for TDD Phase 2."""
+"""Event and FTS5 index models."""
+
+import json
+from datetime import datetime, timezone
 
 import peewee
 from playhouse.sqlite_ext import FTS5Model, SearchField, RowIDField
 
 
 class Event(peewee.Model):
-    """Core event-sourced log. Stub — no fields yet."""
+    """Core event-sourced log. Every agent action becomes an event."""
+
+    event_type = peewee.CharField(max_length=50, index=True)
+    payload = peewee.TextField(default="{}")
+    created_at = peewee.DateTimeField(
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
 
     class Meta:
         table_name = "events"
 
     def get_payload(self) -> dict:
         """Deserialize payload JSON."""
-        raise NotImplementedError
+        return json.loads(self.payload)
 
 
 class EventIndex(FTS5Model):
-    """FTS5 full-text search index over events. Stub."""
+    """FTS5 full-text search index over events."""
 
     rowid = RowIDField()
     text = SearchField()
