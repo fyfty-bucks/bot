@@ -7,6 +7,7 @@ Create structured prompts for LLM interactions.
 ## When to Use
 
 - System prompts for agents
+- Rules and Skills for agents and IDE like Cursor
 - Few-shot examples
 - Classification/extraction prompts
 

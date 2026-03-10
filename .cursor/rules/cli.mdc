@@ -1,10 +1,10 @@
 ---
 description: CLI standards — modular commands, LLM-readable output
-globs: src/cli.py, src/cli_commands/
+globs: src/cli.py,src/cli_commands/**/*.py
 alwaysApply: false
 ---
 
-# CLI Standards
+# CLI
 
 ## Entry Point
 
@@ -12,61 +12,19 @@ alwaysApply: false
 
 ---
 
-## Modular Command Architecture
+## Plugin Pattern
 
-Commands are plugins in `src/cli_commands/`:
-
-```
-src/
-├── cli.py                       # Router: discovers + registers commands
-└── cli_commands/
-    ├── __init__.py              # Command registry
-    ├── info.py                  # ./agent info
-    ├── lint.py                  # ./agent lint
-    ├── tests.py                 # ./agent tests
-    ├── budget.py                # ./agent budget (future)
-    └── ...                      # New commands = new files
-```
-
-Each command module exports: `name`, `help`, `setup(subparser)`, `run(args)`.
+Commands are plugins in `src/cli_commands/`.
+Each module exports: `name`, `help`, `setup(subparser)`, `run(args)`.
 Adding a command = adding one file. No changes to cli.py.
 
 ---
 
-## Output Format
-
-Optimized for LLM parsing AND human readability:
-
-```
-[COMMAND] description
-KEY: value
-KEY: value
----
-SECTION
-  ITEM: detail
-  ITEM: detail
----
-RESULT: OK | FAIL | WARN
-```
-
-### Rules
+## Output Rules
 
 - Structured key-value, not prose
-- Sections separated by `---`
-- Lists indented 2 spaces
-- Status always last line: `RESULT: OK|FAIL|WARN`
 - No ANSI colors by default (SSH/LLM safe)
-- `--json` flag for machine-parseable output (future)
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error (runtime) |
-| 2 | Usage error (bad args) |
+- Status always last line: `RESULT: OK|FAIL|WARN`
 
 ---
 

@@ -1,0 +1,45 @@
+---
+description: Hard limits and verification — enforced by linter and model
+globs: 
+alwaysApply: true
+---
+
+# Standards
+
+## Principle
+
+File size limits are context engineering.
+Every file fits in a context window. Linter enforces this.
+
+---
+
+## Limits
+
+Defined in `pyproject.toml` `[tool.agent-lint]`, enforced by `./agent lint`.
+When exceeded: split into submodules or extract to separate module.
+
+---
+
+## Code Rules
+
+- Module docstring required for every .py file
+- Type hints required on public function signatures (not `_private`)
+- Linter reads .gitignore and skips excluded paths
+- DRY: single source of truth per concept — no duplicated logic between modules
+
+---
+
+## Verification
+
+**Verified facts only.** No estimates, no assumed metrics.
+
+| Level | Name | Meaning |
+|-------|------|---------|
+| L1 | Hypothesis | Unverified, in PLAN.md |
+| L2 | Sampled | Partial coverage |
+| L3 | Verified | Full coverage |
+
+NEVER: generate counts without query, hardcode or persist derived metrics
+(in code or conversation), use "approximately/~", assume system state
+
+ALWAYS: run query → show result, state coverage %, mark hypotheses in PLAN.md

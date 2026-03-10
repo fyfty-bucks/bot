@@ -1,0 +1,107 @@
+---
+description: Multi-role audit — code, tests, rules with consensus protocol
+globs: src/**/*.py,tests/**/*.py,.cursor/rules/**/*.mdc
+alwaysApply: false
+---
+
+# Audit
+
+## How to Use
+
+**Independent:** when touching only one file type, activate that role only.
+**Consensus:** when reviewing a complete module, apply ALL relevant roles.
+
+Output per role: PASS with notes / FAIL with specific findings.
+Consensus verdict: ALL roles PASS, or escalate with conflict description.
+
+---
+
+## Role: Code Auditor
+
+Activate when reviewing `src/**/*.py`.
+
+### Quality
+
+1. Single responsibility per function — no function does two unrelated things
+2. Error handling explicit: every function either raises or returns, no ambiguous None
+3. No secrets in code, logs, or exception messages
+4. No unbounded loops, retries, or memory growth — explicit limits
+5. Fail fast on invalid input; no silent fallbacks hiding bugs
+6. No circular dependencies; import direction enforced
+7. No duplicated logic across modules — extract shared code
+
+### Project-Specific
+
+8. Every LLM call through metered router (model, tokens, cost tracked)
+9. User input never interpolated into system prompts (injection defense)
+10. File ownership boundaries respected (see `git.mdc`)
+
+Red flags: bare `except: pass`, hardcoded paths, duplicated logic, god functions.
+
+---
+
+## Role: Test Auditor
+
+Activate when reviewing `tests/**/*.py`.
+
+### Stage Awareness
+
+Tests follow workflow stages (see `workflow.mdc`):
+- TEST stage: tests MUST fail (red) — verify they test real behavior
+- IMPLEMENT stage: code passes tests with minimal logic
+- HARDEN stage: edge cases added — boundaries tested, not just happy path
+
+### Quality
+
+1. Tests encode contract/spec, not implementation internals
+2. Each test has single observable outcome with descriptive name
+3. Error paths covered: invalid input, missing data, timeout, boundary values
+4. Mocks are minimal: mock external dependencies, never the unit under test
+5. Assertions verify observable behavior, not internal state
+
+### Workaround Detection
+
+- Test passes with empty/trivial implementation → test is weak, FAIL
+- Test asserts on mock return value instead of system behavior → fake test, FAIL
+- Test duplicates production logic to compute expected → fragile, FAIL
+- All error paths return same success result → doesn't distinguish, FAIL
+- Test asserts only on structure (e.g. "result is dict") → shallow, FAIL
+
+Red flags: mocking the unit under test, assertions on private state, flaky tests.
+
+---
+
+## Role: Rules Auditor
+
+Activate when reviewing `.cursor/rules/`.
+
+### Pass 1: Context Management
+
+1. File within line limit (`standards.mdc`)
+2. Single responsibility: one file = one concept, no overlapping scope
+3. DRY: no duplicated instructions across rule files
+4. Loading strategy: `alwaysApply` only for universal rules, `globs` for domain
+5. Cross-references valid: referenced rules MUST exist and be consistent
+6. No obsolete content: rules match current phase and capabilities
+
+### Pass 2: Prompt Engineering
+
+7. Unambiguous: MUST/MUST NOT, no "if possible", "try to", "when appropriate"
+8. Structured: consistent pattern across files
+9. Actionable: every rule verifiable by reading code or running a command
+10. No contradictions between rule files
+11. Terminology consistent across all rules
+
+Red flags: vague permissions, unverifiable rules, duplicated content,
+references to non-existent files, rules broader than stated scope.
+
+---
+
+## Consensus Protocol
+
+When reviewing a complete module (code + tests + rules):
+
+1. Apply each relevant role independently
+2. Cross-validate: code findings MUST have corresponding test coverage
+3. If code adds new capability, Rules Auditor verifies governance exists
+4. Verdict: ALL roles PASS, or report specific conflict for user escalation

@@ -1,0 +1,112 @@
+---
+description: Development workflow — stages, gates, testing, interfaces, hardening
+globs: 
+alwaysApply: true
+---
+
+# Workflow
+
+**Never skip a stage gate.** Think thoroughly before first edit.
+
+---
+
+## Terminology
+
+- **Stage** — workflow step: SPIKE, DESIGN, TEST, IMPLEMENT, VALIDATE, HARDEN
+- **Phase** — project milestone in PLAN.md: Phase 0, 1, 2, ...
+- **Step** — numbered action within a phase
+
+---
+
+## SPIKE — when task is unclear or involves unknown API
+
+1. Throwaway script (`scripts/spike_*.py`), explore, document in PLAN.md, delete
+2. No tests, no quality. Goal: ambiguity → clarity
+3. Engineering-clear? → DESIGN. Unclear? → SPIKE the unclear part
+
+**GATE:** findings in PLAN.md → STOP, user reviews
+
+## DESIGN — define contracts before code
+
+1. Define public method signatures (name, args, return type)
+2. Define error semantics: every function either raises or returns, no ambiguous None
+3. Write stubs (`NotImplementedError` bodies) for pytest collection
+4. Principles: contract-first, immutable dataclasses, no constructor side effects,
+   single responsibility, explicit state transitions
+
+**GATE:** stubs with interfaces → STOP, user reviews
+
+## TEST — specification as code
+
+1. Tests from spec, NOT from implementation — MUST FAIL (red)
+2. Can't write the test → go back to SPIKE
+3. **Tests are immutable after commit. Never change tests to fit code.**
+4. Each test: single observable outcome, descriptive name
+5. Assertions via `assert` (pytest rewrites for clear diffs)
+6. `sys.path.insert` only in `conftest.py`. No `if __name__ == "__main__"`
+
+**GATE:** failing tests → STOP, user commits
+
+## IMPLEMENT — minimal code to pass tests
+
+1. Pass all tests, nothing more
+2. Test correct + code fails → fix code, not test
+
+**GATE:** passing tests → STOP, user commits
+
+## VALIDATE
+
+1. `./agent lint -v` + full test suite + no regressions
+2. Files over limit → split now (see `standards.mdc`)
+
+## HARDEN — edge cases, error handling, refactoring
+
+Failing tests first, then fixes for each:
+
+**Edge cases:** zero, empty, None, negative, maximum, unicode,
+whitespace-only, nested/recursive, concurrent access
+
+**Hardening:** every error path tested, state machine completeness,
+serialization roundtrip, fault isolation, atomicity with rollback
+
+**Refactoring:** names match behavior, public API matches usage,
+no module-level side effects
+
+**GATE:** edge case tests + fixes → STOP, user commits
+
+---
+
+## Test Conventions
+
+- Runner: `pytest tests/ -v` or `./agent tests -v`
+- Coverage: `pytest --cov=src tests/`
+- Layout mirrors `src/`. Fixtures in `conftest.py` inherited by subfolders
+- Developer writes `tests/`. Agent writes `tests/agent_tests/`
+- No section separator comments. Tests self-documenting via docstrings
+- New tests go at end of file
+
+| Level | What | Stage | Example |
+|-------|------|-------|---------|
+| Unit | Functions | TEST | `parse_command()` |
+| Edge | Boundaries | HARDEN | timeout, OOM, network |
+| Integration | Module flow | HARDEN | `Agent.execute_task()` |
+
+---
+
+## Interface Change Procedure
+
+When a committed interface MUST change:
+
+1. Document WHY + get user approval
+2. Show OLD → NEW mapping (every old test has equivalent)
+3. Update TESTS first, then IMPLEMENTATION
+4. Verify all tests pass, update PLAN.md
+
+---
+
+## Done Criteria
+
+1. Tests pass for affected module
+2. No files over lint limits
+3. No new anti-patterns
+4. PLAN.md updated if milestone reached

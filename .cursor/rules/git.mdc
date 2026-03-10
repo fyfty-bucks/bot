@@ -1,0 +1,77 @@
+---
+description: Git rules — model permissions, commit format, file ownership
+globs: 
+alwaysApply: true
+---
+
+# Git
+
+## Principle
+
+User commits. Model edits. Merge to main via consensus.
+
+---
+
+## Model Permissions
+
+### MAY
+
+- `git status`, `git diff`, `git log` — read-only
+- `git add` — when user requests
+
+### MUST NOT
+
+- `git commit`, `git push`, `git merge`, `git rebase`
+
+---
+
+## Commit Format
+
+```
+type: description
+
+Details if needed
+```
+
+Types: `test`, `code`, `refactor`, `fix`, `docs`, `rule`
+
+---
+
+## Branch Model
+
+Current: working on `main`. Single branch.
+
+### Planned (Phase 2+)
+
+Three tiers: `main` (stable, RPi deploy), `dev` (developer + model), `agent` (RPi autonomous).
+
+```
+main
+├── dev
+└── agent
+    ├── agent/skills
+    └── agent/evolve-N
+```
+
+Flow: dev → consensus → main → agent pulls.
+Merge to main: requires consensus of developers + model review.
+
+---
+
+## File Ownership
+
+### Current
+
+| Owner | Scope | Model may |
+|-------|-------|-----------|
+| Developer | `src/agent/core.py`, `src/cli.py`, `src/utils/` | Read-only |
+| Developer | `.cursor/` | Read-only |
+| Protected | `agent_rules/core-constitution.md` | NEVER modify |
+
+### Planned (when modules created)
+
+| Owner | Scope | Agent may |
+|-------|-------|-----------|
+| Agent | `src/skills/`, `src/agent/prompts/`, `src/agent/config/` | Full control |
+| Agent | `tests/agent_tests/` | Full control |
+| Agent | `agent_rules/runtime/` | Modify within bounds |
