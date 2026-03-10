@@ -9,11 +9,13 @@ from playhouse.sqlite_ext import SqliteDatabase
 logger = logging.getLogger("agent.config")
 
 DEFAULTS = {
-    "model_fast": "haiku",
-    "model_smart": "sonnet",
+    "model_fast": "openai/gpt-4o-mini",
+    "model_smart": "anthropic/claude-sonnet-4.5",
     "budget_total": 50.0,
     "log_level": "INFO",
     "db_path": "agent.db",
+    "cache_ttl": 604800,
+    "budget_alert_days": 7,
 }
 
 TYPE_MAP: dict[str, type] = {
@@ -22,6 +24,8 @@ TYPE_MAP: dict[str, type] = {
     "budget_total": float,
     "log_level": str,
     "db_path": str,
+    "cache_ttl": int,
+    "budget_alert_days": int,
 }
 
 ENV_PREFIX = "AGENT_"
@@ -36,6 +40,8 @@ class Config:
     budget_total: float = field(default=DEFAULTS["budget_total"])
     log_level: str = field(default=DEFAULTS["log_level"])
     db_path: str = field(default=DEFAULTS["db_path"])
+    cache_ttl: int = field(default=DEFAULTS["cache_ttl"])
+    budget_alert_days: int = field(default=DEFAULTS["budget_alert_days"])
 
     @classmethod
     def load(cls, db: SqliteDatabase | None = None) -> "Config":

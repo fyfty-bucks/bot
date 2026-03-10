@@ -11,15 +11,15 @@ from src.agent.models.config_store import ConfigEntry
 def test_config_load_defaults(test_db) -> None:
     """Config.load() returns default values when DB and env are empty."""
     cfg = Config.load(test_db)
-    assert cfg.model_fast == "haiku"
-    assert cfg.model_smart == "sonnet"
+    assert cfg.model_fast == "openai/gpt-4o-mini"
+    assert cfg.model_smart == "anthropic/claude-sonnet-4.5"
     assert cfg.budget_total == 50.0
 
 
 def test_config_load_no_db_uses_defaults() -> None:
     """Config.load() without DB returns pure defaults."""
     cfg = Config.load()
-    assert cfg.model_fast == "haiku"
+    assert cfg.model_fast == "openai/gpt-4o-mini"
     assert cfg.budget_total == 50.0
     assert cfg.db_path == "agent.db"
 
@@ -45,7 +45,7 @@ def test_config_unknown_key_ignored(test_db) -> None:
     """Unknown key in DB does not break config loading."""
     ConfigEntry.upsert("garbage_key_xyz", "whatever")
     cfg = Config.load(test_db)
-    assert cfg.model_fast == "haiku"
+    assert cfg.model_fast == "openai/gpt-4o-mini"
 
 
 def test_config_invalid_db_value_falls_back(test_db) -> None:

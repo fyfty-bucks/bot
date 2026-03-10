@@ -57,8 +57,8 @@ Fitness: `(likes + revenue) / expenses`. Morality is immutable.
 
 ## Current
 
-**Phase:** 1 — Core + DB — DONE
-**Next:** Phase 2 — LLM Integration (spike: OpenRouter API)
+**Phase:** 2 — LLM Integration — DESIGN DONE
+**Next:** TEST stage — write failing tests for `src/llm/`
 
 ---
 

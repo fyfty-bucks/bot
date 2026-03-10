@@ -1,0 +1,232 @@
+"""Tests for src/llm/client.py — OpenRouterClient, load_api_key."""
+
+import json
+
+import httpx
+import pytest
+
+from src.llm.client import OpenRouterClient, RawResponse, load_api_key
+from src.llm.errors import ClientError, ServerError
+
+MESSAGES = [{"role": "user", "content": "Say OK"}]
+MODEL = "openai/gpt-4o-mini"
+
+API_RESPONSE_OK = {
+    "choices": [
+        {
+            "message": {"content": "OK", "role": "assistant"},
+            "finish_reason": "stop",
+        }
+    ],
+    "model": MODEL,
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 2,
+        "total_tokens": 12,
+        "cost": 0.000003,
+    },
+}
+
+
+def _mock_transport(status: int, body: dict) -> httpx.MockTransport:
+    """Create httpx transport returning fixed status + JSON body."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json=body)
+    return handler
+
+
+def test_load_api_key_from_env(monkeypatch) -> None:
+    """load_api_key() returns OPENROUTER_API_KEY env var."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-123")
+    assert load_api_key() == "sk-test-123"
+
+
+def test_load_api_key_from_file(tmp_path, monkeypatch) -> None:
+    """load_api_key() falls back to secrets/.openrouter_key file."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    key_file = tmp_path / ".openrouter_key"
+    key_file.write_text("sk-file-key\n")
+    monkeypatch.setattr(
+        "src.llm.client.Path",
+        lambda *_: tmp_path / ".openrouter_key",
+    )
+    result = load_api_key()
+    assert result == "sk-file-key"
+
+
+def test_load_api_key_missing_raises(monkeypatch, tmp_path) -> None:
+    """load_api_key() raises when no key source available."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    missing = tmp_path / "nonexistent"
+    monkeypatch.setattr(
+        "src.llm.client.Path",
+        lambda *_: missing,
+    )
+    with pytest.raises(RuntimeError):
+        load_api_key()
+
+
+def test_send_success() -> None:
+    """send() returns RawResponse on 200."""
+    transport = _mock_transport(200, API_RESPONSE_OK)
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    result = client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+
+    assert isinstance(result, RawResponse)
+    assert result.content == "OK"
+    assert result.model == MODEL
+    client.close()
+
+
+def test_send_parses_usage_fields() -> None:
+    """send() extracts prompt_tokens, completion_tokens, cost from usage."""
+    transport = _mock_transport(200, API_RESPONSE_OK)
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    result = client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+
+    assert result.prompt_tokens == 10
+    assert result.completion_tokens == 2
+    assert result.cost == 0.000003
+    assert result.finish_reason == "stop"
+    client.close()
+
+
+def test_send_client_error_400() -> None:
+    """send() raises ClientError on HTTP 400."""
+    body = {"error": {"message": "bad request", "code": 400}}
+    transport = _mock_transport(400, body)
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    with pytest.raises(ClientError) as exc_info:
+        client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert exc_info.value.code == 400
+    client.close()
+
+
+def test_send_client_error_401() -> None:
+    """send() raises ClientError on HTTP 401."""
+    body = {"error": {"message": "unauthorized", "code": 401}}
+    transport = _mock_transport(401, body)
+    client = OpenRouterClient(api_key="sk-bad", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    with pytest.raises(ClientError) as exc_info:
+        client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert exc_info.value.code == 401
+    client.close()
+
+
+def test_send_client_error_402() -> None:
+    """send() raises ClientError(402) on insufficient credits."""
+    body = {"error": {"message": "insufficient credits", "code": 402}}
+    transport = _mock_transport(402, body)
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    with pytest.raises(ClientError) as exc_info:
+        client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert exc_info.value.code == 402
+    client.close()
+
+
+def test_send_server_error_429_retries() -> None:
+    """send() retries on HTTP 429 with backoff, then succeeds."""
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            return httpx.Response(
+                429,
+                json={"error": {"message": "rate limited", "code": 429}},
+            )
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    result = client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert result.content == "OK"
+    assert call_count == 3
+    client.close()
+
+
+def test_send_server_error_502_retries() -> None:
+    """send() retries on HTTP 502, then succeeds."""
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return httpx.Response(
+                502, json={"error": {"message": "bad gateway", "code": 502}},
+            )
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    result = client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert call_count == 2
+    assert result.content == "OK"
+    client.close()
+
+
+def test_send_retries_exhaust_raises() -> None:
+    """send() raises ServerError after MAX_RETRIES failed attempts."""
+    transport = _mock_transport(
+        503, {"error": {"message": "unavailable", "code": 503}},
+    )
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    with pytest.raises(ServerError) as exc_info:
+        client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert exc_info.value.code == 503
+    client.close()
+
+
+def test_send_includes_provider_only() -> None:
+    """send() includes provider.only in request body."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+
+    provider = captured["body"].get("provider", {})
+    assert "only" in provider
+    client.close()
+
+
+def test_send_includes_user_field() -> None:
+    """send() includes user field for sticky routing."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+
+    assert "user" in captured["body"]
+    client.close()
+
+
+def test_close() -> None:
+    """close() releases httpx client without error."""
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client.close()

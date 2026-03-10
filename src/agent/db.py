@@ -32,4 +32,5 @@ def get_all_models() -> list:
     from src.agent.models import (
         Event, EventIndex, BudgetLog, Task, ConfigEntry,
     )
-    return [Event, EventIndex, BudgetLog, Task, ConfigEntry]
+    from src.llm.cache import CachedResponse
+    return [Event, EventIndex, BudgetLog, Task, ConfigEntry, CachedResponse]
