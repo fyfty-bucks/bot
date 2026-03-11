@@ -6,6 +6,7 @@ Error types live in src/llm/errors.py.
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,9 +35,29 @@ class RawResponse:
     latency_ms: int
 
 
+def _parse_response(data: dict, latency: int) -> RawResponse:
+    choice = data["choices"][0]
+    usage = data.get("usage", {})
+    return RawResponse(
+        content=choice["message"]["content"],
+        model=data["model"],
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+        cost=usage.get("cost", 0.0),
+        finish_reason=choice.get("finish_reason", "unknown"),
+        latency_ms=latency,
+    )
+
+
 def load_api_key() -> str:
     """Load API key: env var OPENROUTER_API_KEY > secrets/.openrouter_key."""
-    raise NotImplementedError
+    env_key = os.environ.get("OPENROUTER_API_KEY")
+    if env_key:
+        return env_key
+    key_path = Path("secrets/.openrouter_key")
+    if key_path.exists():
+        return key_path.read_text().strip()
+    raise RuntimeError("API key not found: set OPENROUTER_API_KEY or create secrets/.openrouter_key")
 
 
 class OpenRouterClient:
@@ -57,7 +78,45 @@ class OpenRouterClient:
         temperature: float,
     ) -> RawResponse:
         """POST /chat/completions with retry on transient errors."""
-        raise NotImplementedError
+        payload = {
+            "model": model, "messages": messages,
+            "max_tokens": max_tokens, "temperature": temperature,
+            "provider": {"only": [model.split("/")[0]]},
+            "user": "50bucks-agent",
+        }
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        last_exc: ServerError | None = None
+        retries_408 = 1
+
+        for attempt in range(MAX_RETRIES + 1):
+            t0 = int(time.monotonic() * 1000)
+            resp = self._client.post(
+                f"{BASE_URL}/chat/completions", json=payload, headers=headers,
+            )
+            latency = int(time.monotonic() * 1000) - t0
+            code = resp.status_code
+            if code == 200:
+                return _parse_response(resp.json(), latency)
+            try:
+                msg = resp.json().get("error", {}).get("message", resp.text)
+            except Exception:
+                msg = resp.text
+            if code in (400, 401, 402, 403):
+                raise ClientError(code, msg)
+            if code == 408 and retries_408 > 0:
+                retries_408 -= 1
+                time.sleep(RETRY_DELAYS[0])
+                continue
+            if code == 408:
+                raise ServerError(code, msg)
+            if code in (429, 502, 503):
+                last_exc = ServerError(code, msg)
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAYS[min(attempt, len(RETRY_DELAYS) - 1)])
+                    continue
+                raise last_exc
+            raise ClientError(code, msg)
+        raise AssertionError("unreachable: retry loop exited without return or raise")
 
     def close(self) -> None:
         """Release httpx resources."""

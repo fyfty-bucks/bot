@@ -102,12 +102,31 @@ src/agent/prompts/  — deferred to Phase 3
 
 ## Tech Debt (HARDEN)
 
-- [ ] `LLM.call()` propagating `ClientError`/`ServerError` — no test
-- [ ] `httpx.TimeoutException` (network failure) — no test
-- [ ] Malformed API response (missing `choices`/`usage`) — no test
-- [ ] Alert dedup cross-day behavior (next day re-emits) — no test
-- [ ] `record_cost` with zero cost — no test
+### Code
+
+- [ ] Double `check_budget()` per LLM call — reuse first status for alerts
+- [ ] Duplicated `LLMResult` construction (cache hit + API path) — extract helper
+- [ ] Alert dedup scans all today's events into memory — filter in SQL
+- [ ] `_compute_burn` sums in Python — use `fn.SUM(fn.ABS())` SQL aggregate
+- [x] `send()` unreachable `raise last_exc` after loop — replaced with AssertionError
+- [ ] `_parse_response` defaults `cost` to 0.0 on missing `usage.cost` — log warning
 - [ ] Budget burn rate: specify behavior when zero LLM spend in window
+
+### Tests — missing coverage
+
+- [ ] `LLM.call()` propagating `ClientError`/`ServerError` — no test
+- [ ] `httpx.TimeoutException` (network failure) — no test, unhandled in `send()`
+- [ ] Malformed API response (missing `choices`/`usage`) — no test, `_parse_response` will KeyError
+- [ ] Alert dedup cross-day behavior (next day re-emits) — no test
+- [ ] `record_cost` with zero cost — no test, creates BudgetLog with amount=0
+- [ ] Persistent 408 (both retries fail) — no test, only 408→200 tested
+- [ ] `cache_ttl=0` — no test verifying nothing written to `llm_cache` table
+- [ ] Budget tests timing-sensitive — `_compute_burn` uses `now()`, midnight edge case
+
+### Tests — quality
+
+- [ ] Retry tests call real `time.sleep` — mock for speed (~5s wasted)
+- [ ] Tests inject via private attrs (`_client`) — accept factory/transport in ctor
 
 ## Gate
 

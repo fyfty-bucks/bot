@@ -6,7 +6,7 @@ Only caches deterministic calls (temperature == 0).
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import peewee
 
@@ -39,7 +39,19 @@ class ResponseCache:
         self, messages: list[dict], model: str, temperature: float,
     ) -> RawResponse | None:
         """Return cached response if exists and not expired, else None."""
-        raise NotImplementedError
+        key = self.make_key(messages, model, temperature)
+        now = datetime.now(timezone.utc)
+        try:
+            entry = CachedResponse.get(
+                (CachedResponse.cache_key == key)
+                & (CachedResponse.expires_at > now),
+            )
+        except CachedResponse.DoesNotExist:
+            return None
+        CachedResponse.update(
+            hit_count=CachedResponse.hit_count + 1,
+        ).where(CachedResponse.cache_key == key).execute()
+        return RawResponse(**json.loads(entry.response_json))
 
     def put(
         self,
@@ -50,11 +62,42 @@ class ResponseCache:
         ttl: int | None = None,
     ) -> None:
         """Store response in cache. ttl=None uses default."""
-        raise NotImplementedError
+        if temperature != 0.0:
+            return
+        key = self.make_key(messages, model, temperature)
+        effective_ttl = ttl if ttl is not None else self._default_ttl
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(seconds=effective_ttl)
+        resp_json = json.dumps({
+            "content": response.content,
+            "model": response.model,
+            "prompt_tokens": response.prompt_tokens,
+            "completion_tokens": response.completion_tokens,
+            "cost": response.cost,
+            "finish_reason": response.finish_reason,
+            "latency_ms": response.latency_ms,
+        })
+        db = CachedResponse._meta.database
+        with db.atomic():
+            CachedResponse.delete().where(
+                CachedResponse.cache_key == key,
+            ).execute()
+            CachedResponse.create(
+                cache_key=key,
+                response_json=resp_json,
+                model=model,
+                created_at=now,
+                expires_at=expires,
+                hit_count=0,
+            )
 
     @staticmethod
     def make_key(
         messages: list[dict], model: str, temperature: float,
     ) -> str:
         """SHA256 hash of canonical (model, messages, temperature)."""
-        raise NotImplementedError
+        canonical = json.dumps(
+            {"model": model, "messages": messages, "temperature": temperature},
+            sort_keys=True,
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()

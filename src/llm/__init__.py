@@ -59,11 +59,51 @@ class LLM:
         cache_ttl: int | None = None,
     ) -> LLMResult:
         """Send messages to LLM. Checks cache and budget, records cost."""
-        raise NotImplementedError
+        from src.agent.models.events import Event
+
+        cfg = self._config
+        status = check_budget(cfg.budget_total, cfg.budget_alert_days)
+        if status.level == "depleted":
+            raise BudgetExhausted(status)
+        if status.level in ("critical", "danger"):
+            tier = ModelTier.FAST
+
+        model = self._resolve_model(tier)
+        skip_cache = cache_ttl == 0
+        if not skip_cache:
+            cached = self._cache.get(messages, model, temperature)
+            if cached is not None:
+                return LLMResult(
+                    content=cached.content, model=cached.model,
+                    prompt_tokens=cached.prompt_tokens,
+                    completion_tokens=cached.completion_tokens,
+                    cost=cached.cost, latency_ms=cached.latency_ms,
+                    cached=True, finish_reason=cached.finish_reason,
+                )
+
+        raw = self._client.send(model, messages, max_tokens, temperature)
+        record_cost(raw.cost, raw.model, raw.prompt_tokens + raw.completion_tokens)
+        Event.log("llm_call", {
+            "model": raw.model, "prompt_tokens": raw.prompt_tokens,
+            "completion_tokens": raw.completion_tokens,
+            "cost": raw.cost, "latency_ms": raw.latency_ms,
+        })
+        check_alerts(check_budget(cfg.budget_total, cfg.budget_alert_days))
+        if not skip_cache:
+            self._cache.put(messages, model, temperature, raw, ttl=cache_ttl)
+        return LLMResult(
+            content=raw.content, model=raw.model,
+            prompt_tokens=raw.prompt_tokens,
+            completion_tokens=raw.completion_tokens,
+            cost=raw.cost, latency_ms=raw.latency_ms,
+            cached=False, finish_reason=raw.finish_reason,
+        )
 
     def _resolve_model(self, tier: ModelTier) -> str:
         """Map tier enum to model slug from config."""
-        raise NotImplementedError
+        if tier == ModelTier.SMART:
+            return self._config.model_smart
+        return self._config.model_fast
 
     def close(self) -> None:
         """Release httpx client resources."""
