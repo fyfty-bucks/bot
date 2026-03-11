@@ -44,8 +44,8 @@ Fitness: `(likes + revenue) / expenses`. Morality is immutable.
 |-------|------|------|--------|
 | 0 | here | Foundation | DONE |
 | 1 | [PLAN1](PLAN1.md) | Core + DB | DONE |
-| 2 | [PLAN2](PLAN2.md) | LLM Integration | NEXT |
-| 3 | [PLAN3](PLAN3.md) | Telegram Bot | — |
+| 2 | [PLAN2](PLAN2.md) | LLM Integration | HARDEN |
+| 3 | [PLAN3](PLAN3.md) | Telegram Bot + Agent Loop | — |
 | 4 | [PLAN4](PLAN4.md) | Deploy to RPi | — |
 | 5 | [PLAN5](PLAN5.md) | Survival I: CustDev | — |
 | 6 | [PLAN6](PLAN6.md) | Survival II: Growth | — |
@@ -57,8 +57,8 @@ Fitness: `(likes + revenue) / expenses`. Morality is immutable.
 
 ## Current
 
-**Phase:** 2 — LLM Integration — DESIGN DONE
-**Next:** TEST stage — write failing tests for `src/llm/`
+**Phase:** 2 — LLM Integration — HARDEN
+**Next:** close tech debt (PLAN2.md), then Phase 3
 
 ---
 
