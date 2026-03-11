@@ -81,7 +81,6 @@ class OpenRouterClient:
         payload = {
             "model": model, "messages": messages,
             "max_tokens": max_tokens, "temperature": temperature,
-            "provider": {"only": [model.split("/")[0]]},
             "user": "50bucks-agent",
         }
         headers = {"Authorization": f"Bearer {self._api_key}"}

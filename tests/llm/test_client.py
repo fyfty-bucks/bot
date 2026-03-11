@@ -163,23 +163,6 @@ def test_send_retries_exhaust_raises() -> None:
     client.close()
 
 
-def test_send_includes_provider_only() -> None:
-    """send() includes provider.only in request body."""
-    captured = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["body"] = json.loads(request.content)
-        return httpx.Response(200, json=API_RESPONSE_OK)
-
-    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
-    client._client = httpx.Client(transport=httpx.MockTransport(handler))
-    client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
-
-    provider = captured["body"].get("provider", {})
-    assert "only" in provider
-    client.close()
-
-
 def test_send_includes_user_field() -> None:
     """send() includes user field for sticky routing."""
     captured = {}

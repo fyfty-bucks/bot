@@ -1,6 +1,6 @@
 # Phase 2: LLM Integration
 
-**Status:** TEST DONE → IMPLEMENT
+**Status:** IMPLEMENT DONE → VALIDATE PASSED
 
 ---
 
@@ -60,19 +60,20 @@ JSON is 17% more tokens but convenient for programmatic composition.
 | httpx (not SDK) | Already in deps, full control, easy mock |
 | No tiktoken | API reports native token counts |
 | Client-side SQLite cache | 100% hit savings, deterministic |
-| `provider.only` + `user` | Free OpenAI server-cache bonus |
+| ~~`provider.only`~~ removed | 403 from providers (regional/account block) |
+| `user` field | Sticky routing for potential server-cache |
 | Client-side model routing | `models[]` array broken |
 | JSON system prompts | Programmatic composition via dict |
 | gpt-4o-mini for tests | $0.15/$0.60, cheapest |
 
 ## Deliverables
 
-- [ ] OpenRouter client (`src/llm/client.py`, httpx, retry with backoff)
-- [ ] Two-model router (`src/llm/__init__.py`, LLM._resolve_model, tier-based)
-- [ ] Response cache (`src/llm/cache.py`, SQLite, TTL, SHA256 key)
-- [ ] Audit trail: every call → Event (model, tokens, cost, latency)
-- [ ] Budget integration: every call → BudgetLog.record()
-- [ ] Budget guard: check_budget() + check_alerts() + BudgetExhausted
+- [x] OpenRouter client (`src/llm/client.py`, httpx, retry with backoff)
+- [x] Two-model router (`src/llm/__init__.py`, LLM._resolve_model, tier-based)
+- [x] Response cache (`src/llm/cache.py`, SQLite, TTL, SHA256 key)
+- [x] Audit trail: every call → Event (model, tokens, cost, latency)
+- [x] Budget integration: every call → BudgetLog.record()
+- [x] Budget guard: check_budget() + check_alerts() + BudgetExhausted
 - [ ] Prompt system (`src/agent/prompts/`) — deferred to Phase 3
 
 ## Module structure
@@ -109,6 +110,7 @@ src/agent/prompts/  — deferred to Phase 3
 - [ ] Alert dedup scans all today's events into memory — filter in SQL
 - [ ] `_compute_burn` sums in Python — use `fn.SUM(fn.ABS())` SQL aggregate
 - [x] `send()` unreachable `raise last_exc` after loop — replaced with AssertionError
+- [x] `provider.only` causes 403 — removed from payload, test removed
 - [ ] `_parse_response` defaults `cost` to 0.0 on missing `usage.cost` — log warning
 - [ ] Budget burn rate: specify behavior when zero LLM spend in window
 
