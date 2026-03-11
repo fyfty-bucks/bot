@@ -10,7 +10,9 @@ from src.agent.models.budget import BudgetLog
 from src.agent.models.events import Event
 from src.llm import LLM, LLMResult, ModelTier
 from src.llm.budget import BudgetExhausted
+from src.llm.cache import CachedResponse
 from src.llm.client import RawResponse
+from src.llm.errors import ClientError, ServerError
 
 MESSAGES = [{"role": "user", "content": "Hello"}]
 
@@ -207,4 +209,45 @@ def test_resolve_model_smart(test_db, test_config) -> None:
     """_resolve_model(SMART) returns config.model_smart."""
     llm = _make_llm(test_config, test_db)
     assert llm._resolve_model(ModelTier.SMART) == test_config.model_smart
+    llm.close()
+
+
+def test_call_propagates_client_error(test_db, test_config) -> None:
+    """call() propagates ClientError from transport layer."""
+    def failing_send(*args, **kwargs):
+        raise ClientError(401, "unauthorized")
+
+    llm = _make_llm(test_config, test_db)
+    BudgetLog.record(amount=50.0, category="seed")
+    llm._client.send = failing_send
+
+    with pytest.raises(ClientError) as exc_info:
+        llm.call(MESSAGES)
+    assert exc_info.value.code == 401
+    llm.close()
+
+
+def test_call_propagates_server_error(test_db, test_config) -> None:
+    """call() propagates ServerError from transport layer."""
+    def failing_send(*args, **kwargs):
+        raise ServerError(503, "unavailable")
+
+    llm = _make_llm(test_config, test_db)
+    BudgetLog.record(amount=50.0, category="seed")
+    llm._client.send = failing_send
+
+    with pytest.raises(ServerError) as exc_info:
+        llm.call(MESSAGES)
+    assert exc_info.value.code == 503
+    llm.close()
+
+
+def test_call_cache_ttl_zero_no_cache_row(test_db, test_config) -> None:
+    """call(cache_ttl=0) does not write any row to llm_cache table."""
+    llm = _make_llm(test_config, test_db)
+    BudgetLog.record(amount=50.0, category="seed")
+
+    llm.call(MESSAGES, cache_ttl=0)
+
+    assert CachedResponse.select().count() == 0
     llm.close()

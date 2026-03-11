@@ -36,6 +36,8 @@ class RawResponse:
 
 
 def _parse_response(data: dict, latency: int) -> RawResponse:
+    if "choices" not in data or not data["choices"]:
+        raise ClientError(502, "Malformed API response: missing 'choices'")
     choice = data["choices"][0]
     usage = data.get("usage", {})
     return RawResponse(
@@ -89,9 +91,16 @@ class OpenRouterClient:
 
         for attempt in range(MAX_RETRIES + 1):
             t0 = int(time.monotonic() * 1000)
-            resp = self._client.post(
-                f"{BASE_URL}/chat/completions", json=payload, headers=headers,
-            )
+            try:
+                resp = self._client.post(
+                    f"{BASE_URL}/chat/completions", json=payload, headers=headers,
+                )
+            except httpx.TimeoutException as exc:
+                last_exc = ServerError(408, str(exc))
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAYS[min(attempt, len(RETRY_DELAYS) - 1)])
+                    continue
+                raise last_exc from exc
             latency = int(time.monotonic() * 1000) - t0
             code = resp.status_code
             if code == 200:
@@ -102,7 +111,7 @@ class OpenRouterClient:
                 msg = resp.text
             if code in (400, 401, 402, 403):
                 raise ClientError(code, msg)
-            if code == 408 and retries_408 > 0:
+            if code == 408 and retries_408 > 0 and attempt < MAX_RETRIES:
                 retries_408 -= 1
                 time.sleep(RETRY_DELAYS[0])
                 continue

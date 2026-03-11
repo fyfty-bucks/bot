@@ -177,3 +177,60 @@ def test_check_alerts_depleted_always_emits(test_db) -> None:
         Event.select().where(Event.event_type == "budget_alert"),
     )
     assert len(alerts) == 2
+
+
+def test_record_cost_zero_creates_entry(test_db) -> None:
+    """record_cost(0.0) creates BudgetLog entry with zero amount."""
+    _seed_budget(BUDGET_TOTAL)
+    record_cost(cost=0.0, model="openai/gpt-4o-mini", tokens=0)
+
+    entries = list(BudgetLog.select().where(BudgetLog.category == "llm"))
+    assert len(entries) == 1
+    assert entries[0].amount == 0.0
+    assert entries[0].balance_after == BUDGET_TOTAL
+
+
+def test_check_alerts_cross_day_reemits(test_db) -> None:
+    """Warning emitted yesterday does not block today's warning."""
+    yesterday_payload = {
+        "level": bgt.LEVEL_WARNING, "balance": 10.0,
+        "daily_burn": 2.0, "days_remaining": 5.0,
+    }
+    event = Event.log("budget_alert", yesterday_payload)
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    Event.update(created_at=yesterday).where(
+        Event.id == event.id,
+    ).execute()
+
+    status = BudgetStatus(
+        balance=10.0, daily_burn=2.0,
+        days_remaining=5.0, level=bgt.LEVEL_WARNING,
+    )
+    check_alerts(status)
+
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+    today_alerts = list(
+        Event.select().where(
+            (Event.event_type == "budget_alert")
+            & (Event.created_at >= today_start),
+        ),
+    )
+    assert len(today_alerts) == 1
+
+
+def test_check_budget_zero_burn_returns_ok(test_db) -> None:
+    """All spend outside alert window: burn=0, level=ok, days_remaining=None."""
+    _seed_budget(BUDGET_TOTAL)
+    entry = BudgetLog.record(amount=-1.0, category="llm", description="old")
+    old_date = datetime.now(timezone.utc) - timedelta(days=30)
+    BudgetLog.update(created_at=old_date).where(
+        BudgetLog.id == entry.id,
+    ).execute()
+
+    status = check_budget(BUDGET_TOTAL)
+
+    assert status.level == bgt.LEVEL_OK
+    assert status.daily_burn == 0.0
+    assert status.days_remaining is None

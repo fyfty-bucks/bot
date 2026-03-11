@@ -1,6 +1,6 @@
 # Phase 2: LLM Integration
 
-**Status:** IMPLEMENT DONE → VALIDATE PASSED
+**Status:** HARDEN DONE
 
 ---
 
@@ -110,24 +110,26 @@ src/agent/prompts/  — deferred to Phase 3
 - [ ] Alert dedup scans all today's events into memory — filter in SQL
 - [ ] `_compute_burn` sums in Python — use `fn.SUM(fn.ABS())` SQL aggregate
 - [x] `send()` unreachable `raise last_exc` after loop — replaced with AssertionError
+- [x] `httpx.TimeoutException` bypassed retry loop — now retries with backoff
+- [x] HTTP 408 on last attempt hit AssertionError — added `attempt < MAX_RETRIES` guard
 - [x] `provider.only` causes 403 — removed from payload, test removed
 - [ ] `_parse_response` defaults `cost` to 0.0 on missing `usage.cost` — log warning
-- [ ] Budget burn rate: specify behavior when zero LLM spend in window
+- [x] Budget burn rate: zero spend in window → burn=0, level=ok, days_remaining=None
 
 ### Tests — missing coverage
 
-- [ ] `LLM.call()` propagating `ClientError`/`ServerError` — no test
-- [ ] `httpx.TimeoutException` (network failure) — no test, unhandled in `send()`
-- [ ] Malformed API response (missing `choices`/`usage`) — no test, `_parse_response` will KeyError
-- [ ] Alert dedup cross-day behavior (next day re-emits) — no test
-- [ ] `record_cost` with zero cost — no test, creates BudgetLog with amount=0
-- [ ] Persistent 408 (both retries fail) — no test, only 408→200 tested
-- [ ] `cache_ttl=0` — no test verifying nothing written to `llm_cache` table
+- [x] `LLM.call()` propagating `ClientError`/`ServerError` — test_call_propagates_*
+- [x] `httpx.TimeoutException` (network failure) — handled in `send()`, test passes
+- [x] Malformed API response (missing `choices`) — `_parse_response` raises ClientError
+- [x] Alert dedup cross-day behavior (next day re-emits) — test_check_alerts_cross_day_reemits
+- [x] `record_cost` with zero cost — test_record_cost_zero_creates_entry
+- [x] Persistent 408 (both retries fail) — test_send_persistent_408_raises_server_error
+- [x] `cache_ttl=0` — test_call_cache_ttl_zero_no_cache_row
 - [ ] Budget tests timing-sensitive — `_compute_burn` uses `now()`, midnight edge case
 
 ### Tests — quality
 
-- [ ] Retry tests call real `time.sleep` — mock for speed (~5s wasted)
+- [x] Retry tests call real `time.sleep` — patched via `@patch("src.llm.client.time.sleep")`
 - [ ] Tests inject via private attrs (`_client`) — accept factory/transport in ctor
 
 ## Gate
