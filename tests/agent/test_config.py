@@ -14,6 +14,8 @@ def test_config_load_defaults(test_db) -> None:
     assert cfg.model_fast == "openai/gpt-4o-mini"
     assert cfg.model_smart == "anthropic/claude-sonnet-4.5"
     assert cfg.budget_total == 50.0
+    assert cfg.cache_ttl == 604800
+    assert cfg.budget_alert_days == 7
 
 
 def test_config_load_no_db_uses_defaults() -> None:

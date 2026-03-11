@@ -1,7 +1,7 @@
 """Tests for src/llm/__init__.py — LLM.call() integration."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -101,7 +101,7 @@ def test_call_skips_cache_when_ttl_zero(test_db, test_config) -> None:
 
 
 def test_call_records_cost(test_db, test_config) -> None:
-    """call() creates BudgetLog entry with negative cost."""
+    """call() creates BudgetLog entry with exact API-reported cost."""
     llm = _make_llm(test_config, test_db)
     BudgetLog.record(amount=50.0, category="seed")
 
@@ -111,7 +111,7 @@ def test_call_records_cost(test_db, test_config) -> None:
         BudgetLog.select().where(BudgetLog.category == "llm"),
     )
     assert len(llm_entries) == 1
-    assert llm_entries[0].amount < 0
+    assert llm_entries[0].amount == -0.000005
     llm.close()
 
 
@@ -146,26 +146,65 @@ def test_call_raises_budget_exhausted(test_db, test_config) -> None:
 
 def test_call_forces_fast_on_critical(test_db, test_config) -> None:
     """call(tier=SMART) uses FAST model when budget is critical."""
-    test_config_smart = test_config
-    llm = _make_llm(test_config_smart, test_db)
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=API_RESPONSE)
+
+    llm = _make_llm(test_config, test_db)
+    llm._client._client = httpx.Client(transport=httpx.MockTransport(handler))
     BudgetLog.record(amount=50.0, category="seed")
-    BudgetLog.record(amount=-48.0, category="llm")
+    BudgetLog.record(amount=-39.0, category="llm")  # balance=11, ~2 days → critical
 
-    result = llm.call(MESSAGES, tier=ModelTier.SMART)
+    llm.call(MESSAGES, tier=ModelTier.SMART)
 
-    assert result.model == test_config.model_fast
+    assert captured["body"]["model"] == test_config.model_fast
+    llm.close()
+
+
+def test_call_cache_hit_no_extra_cost(test_db, test_config) -> None:
+    """Cache hit does not create additional BudgetLog entry."""
+    llm = _make_llm(test_config, test_db)
+    BudgetLog.record(amount=50.0, category="seed")
+
+    llm.call(MESSAGES, temperature=0.0)
+    llm.call(MESSAGES, temperature=0.0)
+
+    llm_entries = list(
+        BudgetLog.select().where(BudgetLog.category == "llm"),
+    )
+    assert len(llm_entries) == 1
+    llm.close()
+
+
+def test_call_smart_tier_sends_smart_model(test_db, test_config) -> None:
+    """call(tier=SMART) sends model_smart when budget is OK."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=API_RESPONSE)
+
+    llm = _make_llm(test_config, test_db)
+    llm._client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    BudgetLog.record(amount=50.0, category="seed")
+
+    llm.call(MESSAGES, tier=ModelTier.SMART)
+
+    assert captured["body"]["model"] == test_config.model_smart
     llm.close()
 
 
 def test_resolve_model_fast(test_db, test_config) -> None:
     """_resolve_model(FAST) returns config.model_fast."""
     llm = _make_llm(test_config, test_db)
-    assert llm._resolve_model(ModelTier.FAST) == "openai/gpt-4o-mini"
+    assert llm._resolve_model(ModelTier.FAST) == test_config.model_fast
     llm.close()
 
 
 def test_resolve_model_smart(test_db, test_config) -> None:
     """_resolve_model(SMART) returns config.model_smart."""
     llm = _make_llm(test_config, test_db)
-    assert llm._resolve_model(ModelTier.SMART) == "openai/gpt-4o-mini"
+    assert llm._resolve_model(ModelTier.SMART) == test_config.model_smart
     llm.close()

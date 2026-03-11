@@ -14,7 +14,7 @@ def test_make_key_deterministic() -> None:
     k1 = ResponseCache.make_key(MESSAGES, MODEL, 0.0)
     k2 = ResponseCache.make_key(MESSAGES, MODEL, 0.0)
     assert k1 == k2
-    assert len(k1) == 32
+    assert len(k1) == 64
 
 
 def test_make_key_differs_on_model() -> None:
@@ -106,3 +106,13 @@ def test_put_overwrites_existing(test_db, sample_response) -> None:
     assert result is not None
     assert result.content == "updated"
     assert CachedResponse.select().count() == 1
+
+
+def test_put_skips_nonzero_temperature(test_db, sample_response) -> None:
+    """put() does not cache when temperature != 0."""
+    cache = ResponseCache(default_ttl=3600)
+    cache.put(MESSAGES, MODEL, 0.7, sample_response)
+
+    result = cache.get(MESSAGES, MODEL, 0.7)
+    assert result is None
+    assert CachedResponse.select().count() == 0

@@ -44,8 +44,8 @@ class BudgetExhausted(Exception):
 def check_budget(budget_total: float) -> BudgetStatus:
     """Compute current balance, burn rate, and alert level.
 
-    Burn rate = average daily LLM spend over last 7 days.
-    Days remaining = balance / daily_burn.
+    Burn rate = total LLM spend in last N days / N (N = budget_alert_days).
+    Days remaining = balance / daily_burn (None when no spend history).
     """
     raise NotImplementedError
 

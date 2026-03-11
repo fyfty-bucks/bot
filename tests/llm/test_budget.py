@@ -48,9 +48,7 @@ def test_check_budget_ok(test_db) -> None:
 def test_check_budget_warning(test_db) -> None:
     """3-7 days remaining → level='warning'."""
     _seed_budget(BUDGET_TOTAL)
-    daily = BUDGET_TOTAL / 5.0
-    for _ in range(7):
-        _spend(daily)
+    _spend(29.0)  # balance=21, burn≈4.1/d → ~5 days remaining
     status = check_budget(BUDGET_TOTAL)
     assert status.level == bgt.LEVEL_WARNING
 
@@ -58,9 +56,7 @@ def test_check_budget_warning(test_db) -> None:
 def test_check_budget_critical(test_db) -> None:
     """1-3 days remaining → level='critical'."""
     _seed_budget(BUDGET_TOTAL)
-    daily = BUDGET_TOTAL / 2.0
-    for _ in range(7):
-        _spend(daily)
+    _spend(39.0)  # balance=11, burn≈5.6/d → ~2 days remaining
     status = check_budget(BUDGET_TOTAL)
     assert status.level == bgt.LEVEL_CRITICAL
 
@@ -68,9 +64,7 @@ def test_check_budget_critical(test_db) -> None:
 def test_check_budget_danger(test_db) -> None:
     """0-1 days remaining → level='danger'."""
     _seed_budget(BUDGET_TOTAL)
-    daily = BUDGET_TOTAL / 0.8
-    for _ in range(7):
-        _spend(daily)
+    _spend(47.0)  # balance=3, burn≈6.7/d → ~0.4 days remaining
     status = check_budget(BUDGET_TOTAL)
     assert status.level == bgt.LEVEL_DANGER
 
@@ -155,3 +149,31 @@ def test_check_alerts_ok_emits_nothing(test_db) -> None:
         Event.select().where(Event.event_type == "budget_alert"),
     )
     assert len(alerts) == 0
+
+
+def test_check_alerts_deduplicates_critical(test_db) -> None:
+    """check_alerts() skips if critical already emitted today."""
+    status = BudgetStatus(
+        balance=5.0, daily_burn=3.0, days_remaining=1.7, level=bgt.LEVEL_CRITICAL,
+    )
+    check_alerts(status)
+    check_alerts(status)
+
+    alerts = list(
+        Event.select().where(Event.event_type == "budget_alert"),
+    )
+    assert len(alerts) == 1
+
+
+def test_check_alerts_depleted_always_emits(test_db) -> None:
+    """check_alerts() emits depleted on every call (no dedup)."""
+    status = BudgetStatus(
+        balance=-1.0, daily_burn=10.0, days_remaining=0.0, level=bgt.LEVEL_DEPLETED,
+    )
+    check_alerts(status)
+    check_alerts(status)
+
+    alerts = list(
+        Event.select().where(Event.event_type == "budget_alert"),
+    )
+    assert len(alerts) == 2

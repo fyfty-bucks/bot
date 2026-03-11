@@ -25,7 +25,7 @@ def test_config() -> Config:
     """Config with test defaults (cheap model, short cache TTL)."""
     return Config(
         model_fast="openai/gpt-4o-mini",
-        model_smart="openai/gpt-4o-mini",
+        model_smart="anthropic/claude-sonnet-4.5",
         budget_total=50.0,
         cache_ttl=3600,
         budget_alert_days=7,

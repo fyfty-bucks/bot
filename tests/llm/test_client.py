@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from src.llm.client import OpenRouterClient, RawResponse, load_api_key
+from src.llm.client import OpenRouterClient, RawResponse
 from src.llm.errors import ClientError, ServerError
 
 MESSAGES = [{"role": "user", "content": "Say OK"}]
@@ -32,38 +32,7 @@ def _mock_transport(status: int, body: dict) -> httpx.MockTransport:
     """Create httpx transport returning fixed status + JSON body."""
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status, json=body)
-    return handler
-
-
-def test_load_api_key_from_env(monkeypatch) -> None:
-    """load_api_key() returns OPENROUTER_API_KEY env var."""
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test-123")
-    assert load_api_key() == "sk-test-123"
-
-
-def test_load_api_key_from_file(tmp_path, monkeypatch) -> None:
-    """load_api_key() falls back to secrets/.openrouter_key file."""
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    key_file = tmp_path / ".openrouter_key"
-    key_file.write_text("sk-file-key\n")
-    monkeypatch.setattr(
-        "src.llm.client.Path",
-        lambda *_: tmp_path / ".openrouter_key",
-    )
-    result = load_api_key()
-    assert result == "sk-file-key"
-
-
-def test_load_api_key_missing_raises(monkeypatch, tmp_path) -> None:
-    """load_api_key() raises when no key source available."""
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    missing = tmp_path / "nonexistent"
-    monkeypatch.setattr(
-        "src.llm.client.Path",
-        lambda *_: missing,
-    )
-    with pytest.raises(RuntimeError):
-        load_api_key()
+    return httpx.MockTransport(handler)
 
 
 def test_send_success() -> None:
@@ -92,6 +61,7 @@ def test_send_parses_usage_fields() -> None:
     assert result.completion_tokens == 2
     assert result.cost == 0.000003
     assert result.finish_reason == "stop"
+    assert result.latency_ms >= 0
     client.close()
 
 
@@ -229,4 +199,71 @@ def test_send_includes_user_field() -> None:
 def test_close() -> None:
     """close() releases httpx client without error."""
     client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client.close()
+
+
+def test_send_client_error_403() -> None:
+    """send() raises ClientError on HTTP 403."""
+    body = {"error": {"message": "forbidden", "code": 403}}
+    transport = _mock_transport(403, body)
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=transport)
+
+    with pytest.raises(ClientError) as exc_info:
+        client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert exc_info.value.code == 403
+    client.close()
+
+
+def test_send_timeout_408_retries_once() -> None:
+    """send() retries once on HTTP 408, then succeeds."""
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return httpx.Response(
+                408, json={"error": {"message": "timeout", "code": 408}},
+            )
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    result = client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+    assert result.content == "OK"
+    assert call_count == 2
+    client.close()
+
+
+def test_send_includes_auth_header() -> None:
+    """send() sends Authorization: Bearer header."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["headers"] = dict(request.headers)
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test-key", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.send(MODEL, MESSAGES, max_tokens=10, temperature=0)
+
+    assert captured["headers"]["authorization"] == "Bearer sk-test-key"
+    client.close()
+
+
+def test_send_forwards_max_tokens() -> None:
+    """send() includes max_tokens in request body."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=API_RESPONSE_OK)
+
+    client = OpenRouterClient(api_key="sk-test", timeout=5.0)
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.send(MODEL, MESSAGES, max_tokens=42, temperature=0)
+
+    assert captured["body"]["max_tokens"] == 42
     client.close()

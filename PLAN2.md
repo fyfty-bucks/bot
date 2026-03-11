@@ -1,6 +1,6 @@
 # Phase 2: LLM Integration
 
-**Status:** DESIGN DONE → TEST
+**Status:** TEST DONE → IMPLEMENT
 
 ---
 
@@ -68,25 +68,24 @@ JSON is 17% more tokens but convenient for programmatic composition.
 ## Deliverables
 
 - [ ] OpenRouter client (`src/llm/client.py`, httpx, retry with backoff)
-- [ ] Two-model router (`src/llm/router.py`, fast/smart, client-side fallback)
-- [ ] Prompt system (`src/agent/prompts/`, JSON templates, runtime vars)
-- [ ] Response cache (`src/llm/cache.py`, SQLite, TTL, hash key)
+- [ ] Two-model router (`src/llm/__init__.py`, LLM._resolve_model, tier-based)
+- [ ] Response cache (`src/llm/cache.py`, SQLite, TTL, SHA256 key)
 - [ ] Audit trail: every call → Event (model, tokens, cost, latency)
 - [ ] Budget integration: every call → BudgetLog.record()
-- [ ] Low-balance alert (threshold TBD in DESIGN)
+- [ ] Budget guard: check_budget() + check_alerts() + BudgetExhausted
+- [ ] Prompt system (`src/agent/prompts/`) — deferred to Phase 3
 
 ## Module structure
 
 ```
 src/llm/
-  __init__.py       — public API: call(), call_streaming()
-  client.py         — httpx wrapper, retry, timeout, provider config
-  router.py         — model selection: fast/smart, fallback
-  cache.py          — SQLite response cache, TTL, hash key
-  cost.py           — pricing table, cost fallback if usage.cost missing
+  __init__.py       — public API: LLM.call(), ModelTier, LLMResult
+  client.py         — httpx wrapper, retry, timeout, RawResponse
+  errors.py         — ClientError, ServerError
+  cache.py          — SQLite response cache, TTL, SHA256 key
+  budget.py         — check_budget(), record_cost(), check_alerts()
 
-src/agent/prompts/
-  __init__.py       — compose_prompt(constitution, context, skill)
+src/agent/prompts/  — deferred to Phase 3
 ```
 
 ## Risks
@@ -95,11 +94,20 @@ src/agent/prompts/
 - Model deprecation on OpenRouter → slug-based config, easy to swap
 - Latency on RPi network → timeout + retry handles this
 
-## Open questions (for DESIGN)
+## Design decisions (resolved)
 
-1. Cache TTL default? (1h? 24h? per-skill?)
-2. Budget alert threshold? (% remaining)
-3. Sonnet escalation: explicit flag only, or auto-detect?
+1. Cache TTL: 7 days default (`config.cache_ttl = 604800`), per-call override via `cache_ttl` param
+2. Budget alert: days-to-depletion model (ok >7d, warning 3–7d, critical 1–3d, danger <1d, depleted ≤0)
+3. Sonnet escalation: explicit `tier=ModelTier.SMART` only; auto-downgrade to FAST on critical/danger
+
+## Tech Debt (HARDEN)
+
+- [ ] `LLM.call()` propagating `ClientError`/`ServerError` — no test
+- [ ] `httpx.TimeoutException` (network failure) — no test
+- [ ] Malformed API response (missing `choices`/`usage`) — no test
+- [ ] Alert dedup cross-day behavior (next day re-emits) — no test
+- [ ] `record_cost` with zero cost — no test
+- [ ] Budget burn rate: specify behavior when zero LLM spend in window
 
 ## Gate
 
