@@ -14,7 +14,7 @@ from playhouse.sqlite_ext import SqliteDatabase
 from src.agent.config import Config
 from src.llm.budget import BudgetExhausted, check_alerts, check_budget, record_cost
 from src.llm.cache import ResponseCache
-from src.llm.client import OpenRouterClient, load_api_key
+from src.llm.client import OpenRouterClient, RawResponse, load_api_key
 
 logger = logging.getLogger("agent.llm")
 
@@ -73,13 +73,7 @@ class LLM:
         if not skip_cache:
             cached = self._cache.get(messages, model, temperature)
             if cached is not None:
-                return LLMResult(
-                    content=cached.content, model=cached.model,
-                    prompt_tokens=cached.prompt_tokens,
-                    completion_tokens=cached.completion_tokens,
-                    cost=cached.cost, latency_ms=cached.latency_ms,
-                    cached=True, finish_reason=cached.finish_reason,
-                )
+                return self._build_result(cached, cached=True)
 
         raw = self._client.send(model, messages, max_tokens, temperature)
         record_cost(raw.cost, raw.model, raw.prompt_tokens + raw.completion_tokens)
@@ -88,15 +82,20 @@ class LLM:
             "completion_tokens": raw.completion_tokens,
             "cost": raw.cost, "latency_ms": raw.latency_ms,
         })
-        check_alerts(check_budget(cfg.budget_total, cfg.budget_alert_days))
+        check_alerts(status)
         if not skip_cache:
             self._cache.put(messages, model, temperature, raw, ttl=cache_ttl)
+        return self._build_result(raw, cached=False)
+
+    @staticmethod
+    def _build_result(raw: RawResponse, cached: bool) -> LLMResult:
+        """Construct LLMResult from RawResponse."""
         return LLMResult(
             content=raw.content, model=raw.model,
             prompt_tokens=raw.prompt_tokens,
             completion_tokens=raw.completion_tokens,
             cost=raw.cost, latency_ms=raw.latency_ms,
-            cached=False, finish_reason=raw.finish_reason,
+            cached=cached, finish_reason=raw.finish_reason,
         )
 
     def _resolve_model(self, tier: ModelTier) -> str:

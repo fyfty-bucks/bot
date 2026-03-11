@@ -36,16 +36,21 @@ class RawResponse:
 
 
 def _parse_response(data: dict, latency: int) -> RawResponse:
+    """Extract fields from OpenRouter response JSON."""
     if "choices" not in data or not data["choices"]:
         raise ClientError(502, "Malformed API response: missing 'choices'")
     choice = data["choices"][0]
     usage = data.get("usage", {})
+    cost = usage.get("cost")
+    if cost is None:
+        logger.warning("API response missing usage.cost, defaulting to 0.0")
+        cost = 0.0
     return RawResponse(
         content=choice["message"]["content"],
         model=data["model"],
         prompt_tokens=usage.get("prompt_tokens", 0),
         completion_tokens=usage.get("completion_tokens", 0),
-        cost=usage.get("cost", 0.0),
+        cost=cost,
         finish_reason=choice.get("finish_reason", "unknown"),
         latency_ms=latency,
     )
@@ -60,6 +65,14 @@ def load_api_key() -> str:
     if key_path.exists():
         return key_path.read_text().strip()
     raise RuntimeError("API key not found: set OPENROUTER_API_KEY or create secrets/.openrouter_key")
+
+
+def _extract_error_msg(resp: httpx.Response) -> str:
+    """Pull error message from JSON body, fall back to raw text."""
+    try:
+        return resp.json().get("error", {}).get("message", resp.text)
+    except Exception:
+        return resp.text
 
 
 class OpenRouterClient:
@@ -105,10 +118,7 @@ class OpenRouterClient:
             code = resp.status_code
             if code == 200:
                 return _parse_response(resp.json(), latency)
-            try:
-                msg = resp.json().get("error", {}).get("message", resp.text)
-            except Exception:
-                msg = resp.text
+            msg = _extract_error_msg(resp)
             if code in (400, 401, 402, 403):
                 raise ClientError(code, msg)
             if code == 408 and retries_408 > 0 and attempt < MAX_RETRIES:

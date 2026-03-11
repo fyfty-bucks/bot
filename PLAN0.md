@@ -44,7 +44,7 @@ Fitness: `(likes + revenue) / expenses`. Morality is immutable.
 |-------|------|------|--------|
 | 0 | here | Foundation | DONE |
 | 1 | [PLAN1](PLAN1.md) | Core + DB | DONE |
-| 2 | [PLAN2](PLAN2.md) | LLM Integration | HARDEN |
+| 2 | [PLAN2](PLAN2.md) | LLM Integration | DONE |
 | 3 | [PLAN3](PLAN3.md) | Telegram Bot + Agent Loop | — |
 | 4 | [PLAN4](PLAN4.md) | Deploy to RPi | — |
 | 5 | [PLAN5](PLAN5.md) | Survival I: CustDev | — |
@@ -57,20 +57,34 @@ Fitness: `(likes + revenue) / expenses`. Morality is immutable.
 
 ## Current
 
-**Phase:** 2 — LLM Integration — HARDEN
-**Next:** close tech debt (PLAN2.md), then Phase 3
+**Phase:** 2 — LLM Integration — DONE
+**Next:** Phase 3 — Telegram Bot + Agent Loop
 
 ---
 
 ## Tech Debt
 
-| ID | Item | Origin | Target | Reason |
-|----|------|--------|--------|--------|
-| TD-1 | `db.atomic()` in `AgentCore.execute()` | Phase 1 | Phase 2 | Atomicity matters with real multi-step LLM transactions |
-| TD-2 | `BudgetLog.record()` race condition | Phase 1 | Phase 5 | Concurrent writes don't exist yet |
-| TD-3 | `BudgetLog` float to Decimal | Phase 1 | Phase 5 | Precision matters with real money |
-| TD-4 | Watchdog | Phase 1 | Phase 4 | Supervision needed on device, not in dev |
-| TD-5 | `BudgetLog` overdraft protection | Phase 1 | Phase 5 | Negative balance allowed now; guard needed with real money |
+### Phase 3 — Agent Loop
+
+| ID | What | Why |
+|----|------|-----|
+| TD-1 | `db.atomic()` in agent loop | Multi-step tool loop needs transactional writes |
+| TD-2 | `OpenRouterClient` accepts transport in ctor | Phase 3 modifies `LLM.call()`; clean DI replaces private attr injection in tests |
+
+### Phase 4 — RPi Deploy
+
+| ID | What | Why |
+|----|------|-----|
+| TD-3 | `BudgetLog.record()` race condition | Webhook = concurrent Telegram users writing budget |
+| TD-4 | Budget tests: inject clock into `_compute_burn` | CI/cron on RPi runs at all hours; midnight edge case |
+
+### Phase 5 — Real Money
+
+| ID | What | Why |
+|----|------|-----|
+| TD-5 | `BudgetLog` float to Decimal | Payment precision requires exact arithmetic |
+| TD-6 | `BudgetLog` overdraft guard | Negative balance ok now; must block with real payments |
+| TD-7 | Budget SQL: Python loops to aggregates | ~3 alerts/day, hundreds of entries; revisit if scale demands |
 
 ---
 

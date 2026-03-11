@@ -101,22 +101,23 @@ src/agent/prompts/  — deferred to Phase 3
 2. Budget alert: days-to-depletion model (ok >7d, warning 3–7d, critical 1–3d, danger <1d, depleted ≤0)
 3. Sonnet escalation: explicit `tier=ModelTier.SMART` only; auto-downgrade to FAST on critical/danger
 
-## Tech Debt (HARDEN)
+## Tech Debt (HARDEN) — DONE
 
-### Code
+All items resolved or moved to PLAN0.md tech debt table (TD-2, TD-4, TD-7).
 
-- [ ] Double `check_budget()` per LLM call — reuse first status for alerts
-- [ ] Duplicated `LLMResult` construction (cache hit + API path) — extract helper
-- [ ] Alert dedup scans all today's events into memory — filter in SQL
-- [ ] `_compute_burn` sums in Python — use `fn.SUM(fn.ABS())` SQL aggregate
+### Code — done
+
+- [x] Double `check_budget()` per LLM call — reuse first status for alerts
+- [x] Duplicated `LLMResult` construction (cache hit + API path) — extract `_build_result()`
 - [x] `send()` unreachable `raise last_exc` after loop — replaced with AssertionError
 - [x] `httpx.TimeoutException` bypassed retry loop — now retries with backoff
 - [x] HTTP 408 on last attempt hit AssertionError — added `attempt < MAX_RETRIES` guard
 - [x] `provider.only` causes 403 — removed from payload, test removed
-- [ ] `_parse_response` defaults `cost` to 0.0 on missing `usage.cost` — log warning
+- [x] `_parse_response` defaults `cost` to 0.0 on missing `usage.cost` — now logs warning
 - [x] Budget burn rate: zero spend in window → burn=0, level=ok, days_remaining=None
+- [x] `send()` func_lines over lint limit — extracted `_extract_error_msg()`
 
-### Tests — missing coverage
+### Tests — done
 
 - [x] `LLM.call()` propagating `ClientError`/`ServerError` — test_call_propagates_*
 - [x] `httpx.TimeoutException` (network failure) — handled in `send()`, test passes
@@ -125,12 +126,8 @@ src/agent/prompts/  — deferred to Phase 3
 - [x] `record_cost` with zero cost — test_record_cost_zero_creates_entry
 - [x] Persistent 408 (both retries fail) — test_send_persistent_408_raises_server_error
 - [x] `cache_ttl=0` — test_call_cache_ttl_zero_no_cache_row
-- [ ] Budget tests timing-sensitive — `_compute_burn` uses `now()`, midnight edge case
-
-### Tests — quality
-
 - [x] Retry tests call real `time.sleep` — patched via `@patch("src.llm.client.time.sleep")`
-- [ ] Tests inject via private attrs (`_client`) — accept factory/transport in ctor
+- [x] `test_client.py` over lint limit — split retry/edge tests to `test_client_retry.py`
 
 ## Gate
 
